@@ -1,0 +1,14 @@
+/** @type {import('next').NextConfig} */
+const backendUrl = process.env.SATQUERY_BACKEND_URL ?? "http://127.0.0.1:8000";
+
+const nextConfig = {
+  reactStrictMode: true,
+  async rewrites() {
+    return [
+      { source: "/health", destination: `${backendUrl}/health` },
+      { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },
+    ];
+  },
+};
+
+module.exports = nextConfig;

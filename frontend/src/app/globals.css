@@ -1,0 +1,440 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+  color-scheme: dark;
+
+  --sq-void: #0b0d10;
+  --sq-ink: #12151a;
+  --sq-panel: #1a1f27;
+  --sq-line: rgba(232, 236, 242, 0.1);
+  --sq-line-strong: rgba(232, 236, 242, 0.18);
+  --sq-text: #e8ecf2;
+  --sq-text-muted: #9aa3b2;
+  --sq-text-faint: #6b7380;
+  --sq-amber: #c9a227;
+  --sq-amber-dim: rgba(201, 162, 39, 0.16);
+  --sq-success: #3d9a6a;
+  --sq-warning: #c47a2c;
+  --sq-danger: #c44c4c;
+
+  --sq-glass-bg: rgba(18, 21, 26, 0.72);
+  --sq-glass-blur: 16px;
+
+  --sq-radius-sm: 4px;
+  --sq-radius-md: 8px;
+  --sq-radius-lg: 12px;
+
+  --sq-font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --sq-font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --sq-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sq-duration: 140ms;
+
+  --sq-focus: 0 0 0 2px var(--sq-void), 0 0 0 4px var(--sq-amber);
+
+  --sq-composer-offset: 88px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--sq-void);
+  color: var(--sq-text);
+  font-family: var(--sq-font-sans);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* ── Glass (overlay chrome only) ── */
+.glass {
+  background: var(--sq-glass-bg);
+  backdrop-filter: blur(var(--sq-glass-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--sq-glass-blur)) saturate(1.2);
+  border: 1px solid rgba(232, 236, 242, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--sq-ink);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ── Solid inspector panel (no glass stacking) ── */
+.inspector-panel {
+  background: var(--sq-ink);
+  border: 1px solid var(--sq-line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Icon rail ── */
+.chrome-rail {
+  width: 48px;
+  background: rgba(18, 21, 26, 0.88);
+  border: 1px solid var(--sq-line);
+  border-radius: var(--sq-radius-sm);
+}
+
+.chrome-rail__mark {
+  display: block;
+  width: 4px;
+  height: 12px;
+  background: var(--sq-amber);
+  flex-shrink: 0;
+}
+
+.chrome-rail__wordmark {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sq-text-muted);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  margin-top: 4px;
+}
+
+.chrome-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto;
+  border: none;
+  border-radius: var(--sq-radius-sm);
+  background: transparent;
+  color: var(--sq-text-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color var(--sq-duration) var(--sq-ease), background var(--sq-duration) var(--sq-ease);
+}
+
+.chrome-btn:hover {
+  color: var(--sq-text);
+  background: rgba(232, 236, 242, 0.04);
+}
+
+.chrome-btn[aria-pressed="true"] {
+  color: var(--sq-amber);
+  background: var(--sq-amber-dim);
+}
+
+.chrome-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sq-focus);
+}
+
+.chrome-btn[data-tooltip] {
+  position: relative;
+}
+
+.chrome-btn[data-tooltip]:hover::after,
+.chrome-btn[data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 8px;
+  background: var(--sq-panel);
+  border: 1px solid var(--sq-line);
+  border-radius: var(--sq-radius-sm);
+  color: var(--sq-text);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* ── Map tool cluster ── */
+.map-tool-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--sq-radius-sm);
+  background: rgba(18, 21, 26, 0.88);
+  border: 1px solid var(--sq-line);
+}
+
+.map-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--sq-radius-sm);
+  background: transparent;
+  color: var(--sq-text-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color var(--sq-duration) var(--sq-ease), background var(--sq-duration) var(--sq-ease);
+}
+
+.map-tool-btn:hover {
+  color: var(--sq-text);
+  background: rgba(232, 236, 242, 0.06);
+}
+
+.map-tool-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sq-focus);
+}
+
+.map-tool-btn[aria-expanded="true"] {
+  color: var(--sq-amber);
+  background: var(--sq-amber-dim);
+}
+
+.layer-popover {
+  background: var(--sq-panel);
+  border: 1px solid var(--sq-line);
+  border-radius: var(--sq-radius-md);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Query composer instrument bar ── */
+.composer-shell {
+  border-radius: var(--sq-radius-lg);
+  padding: 10px 12px;
+}
+
+.composer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  min-height: 32px;
+}
+
+.composer-segment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 10px;
+  border-left: 1px solid var(--sq-line);
+}
+
+.composer-segment:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.composer-segment--grow {
+  flex: 1;
+  min-width: 180px;
+}
+
+.composer-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--sq-text-muted);
+  line-height: 1.3;
+}
+
+.composer-aoi-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font-family: var(--sq-font-mono);
+  font-size: 11px;
+  color: var(--sq-text);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.composer-aoi-btn:hover {
+  color: var(--sq-amber);
+}
+
+.composer-aoi-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sq-focus);
+  border-radius: var(--sq-radius-sm);
+}
+
+.composer-status {
+  margin-bottom: 6px;
+  text-align: center;
+  font-family: var(--sq-font-mono);
+  font-size: 11px;
+  color: var(--sq-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Map empty hint ── */
+.map-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(18, 21, 26, 0.82);
+  border: 1px solid var(--sq-line);
+  border-left: 2px solid var(--sq-amber);
+  border-radius: var(--sq-radius-sm);
+  color: var(--sq-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+/* ── Buttons & inputs ── */
+.btn-primary {
+  background: var(--sq-amber);
+  color: var(--sq-ink);
+  border: none;
+  border-radius: var(--sq-radius-sm);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 80ms var(--sq-ease), filter 120ms var(--sq-ease);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--sq-focus);
+}
+
+.btn-secondary {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--sq-line);
+  border-radius: var(--sq-radius-sm);
+  background: transparent;
+  color: var(--sq-text);
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn-secondary:hover {
+  border-color: var(--sq-line-strong);
+}
+
+.btn-secondary:focus-visible {
+  outline: none;
+  box-shadow: var(--sq-focus);
+}
+
+.input-field {
+  height: 32px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--sq-line);
+  border-radius: var(--sq-radius-sm);
+  color: var(--sq-text);
+  font-size: 13px;
+  padding: 0 8px;
+  font-family: inherit;
+}
+
+.input-field--query {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.input-field--date {
+  font-family: var(--sq-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  min-width: 128px;
+}
+
+.input-field:focus-visible {
+  outline: none;
+  border-color: var(--sq-line-strong);
+  box-shadow: var(--sq-focus);
+}
+
+/* Native date picker icon tint */
+.input-field--date::-webkit-calendar-picker-indicator {
+  filter: invert(0.75);
+  opacity: 0.7;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── MapLibre attribution (workstation chrome) ── */
+.maplibregl-ctrl-bottom-left {
+  left: 12px !important;
+  bottom: var(--sq-composer-offset) !important;
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgba(18, 21, 26, 0.88) !important;
+  border: 1px solid var(--sq-line) !important;
+  border-radius: var(--sq-radius-sm) !important;
+  color: var(--sq-text-faint) !important;
+  font-family: var(--sq-font-mono) !important;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+  max-width: 280px;
+  opacity: 0.85;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--sq-text-muted) !important;
+}
+
+.maplibregl-ctrl-attrib-button {
+  filter: invert(0.7) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .chrome-btn[data-tooltip]:hover::after,
+  .chrome-btn[data-tooltip]:focus-visible::after {
+    display: none;
+  }
+}
