@@ -13,13 +13,23 @@ type Props = {
   onZoomOut: () => void;
   layers: LayerState;
   onLayersChange: (next: LayerState) => void;
+  inspectorOpen?: boolean;
 };
 
-export function MapToolCluster({ onZoomIn, onZoomOut, layers, onLayersChange }: Props) {
+export function MapToolCluster({
+  onZoomIn,
+  onZoomOut,
+  layers,
+  onLayersChange,
+  inspectorOpen = false,
+}: Props) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="absolute right-3 top-3 z-20" data-testid="map-tools">
+    <div
+      className={`map-tools${inspectorOpen ? " map-tools--offset" : ""}`}
+      data-testid="map-tools"
+    >
       <div className="map-tool-cluster">
         <div className="relative">
           <button
@@ -28,19 +38,18 @@ export function MapToolCluster({ onZoomIn, onZoomOut, layers, onLayersChange }: 
             className="map-tool-btn"
             aria-label="Layers"
             aria-expanded={open}
-            title="Layers"
             onClick={() => setOpen((v) => !v)}
           >
             <Stack size={20} weight="regular" />
           </button>
           {open ? (
             <div
-              className="layer-popover absolute right-0 top-[calc(100%+4px)] w-[220px] p-3"
+              className="layer-popover absolute right-0 top-[calc(100%+4px)] w-[200px] p-3"
               role="group"
               aria-label="Map layers"
             >
               <p className="composer-label mb-2">Layers</p>
-              <label className="flex cursor-pointer items-center gap-2 py-1 text-[12px]">
+              <label className="layer-check">
                 <input
                   type="checkbox"
                   checked={layers.detections}
@@ -50,7 +59,7 @@ export function MapToolCluster({ onZoomIn, onZoomOut, layers, onLayersChange }: 
                 />
                 Detections
               </label>
-              <label className="flex cursor-pointer items-center gap-2 py-1 text-[12px]">
+              <label className="layer-check">
                 <input
                   type="checkbox"
                   checked={layers.aoi}
@@ -61,22 +70,10 @@ export function MapToolCluster({ onZoomIn, onZoomOut, layers, onLayersChange }: 
             </div>
           ) : null}
         </div>
-        <button
-          type="button"
-          className="map-tool-btn"
-          aria-label="Zoom in"
-          title="Zoom in"
-          onClick={onZoomIn}
-        >
+        <button type="button" className="map-tool-btn" aria-label="Zoom in" onClick={onZoomIn}>
           <Plus size={20} weight="regular" />
         </button>
-        <button
-          type="button"
-          className="map-tool-btn"
-          aria-label="Zoom out"
-          title="Zoom out"
-          onClick={onZoomOut}
-        >
+        <button type="button" className="map-tool-btn" aria-label="Zoom out" onClick={onZoomOut}>
           <Minus size={20} weight="regular" />
         </button>
       </div>

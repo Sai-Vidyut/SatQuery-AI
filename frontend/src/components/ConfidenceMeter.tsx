@@ -10,18 +10,16 @@ type Props = {
 export function ConfidenceMeter({ confidence, testId = "confidence" }: Props) {
   const pct = Math.round(confidence * 100);
   return (
-    <div data-testid={testId}>
-      <div className="mb-1 flex justify-between text-[11px] text-[var(--sq-text-muted)]">
-        <span>Confidence</span>
-        <span className="tabular-nums" style={{ fontFamily: "var(--sq-font-mono)" }}>
-          {pct}% · {confidenceBand(confidence)}
+    <div data-testid={testId} className="confidence-meter">
+      <div className="confidence-meter__header">
+        <span className="confidence-meter__label">Confidence</span>
+        <span className="confidence-meter__value">
+          {pct}%
+          <span className="confidence-meter__band"> · {confidenceBand(confidence)}</span>
         </span>
       </div>
-      <div className="h-[3px] rounded-sm" style={{ background: "var(--sq-amber-dim)" }}>
-        <div
-          className="h-full rounded-sm"
-          style={{ width: `${pct}%`, background: "var(--sq-amber)" }}
-        />
+      <div className="confidence-meter__track" aria-hidden>
+        <div className="confidence-meter__fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

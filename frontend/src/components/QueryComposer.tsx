@@ -8,7 +8,7 @@ type Props = {
   laterDate: string;
   query: string;
   running: boolean;
-  error: string | null;
+  validationError: string | null;
   statusLine: string | null;
   onEarlierChange: (v: string) => void;
   onLaterChange: (v: string) => void;
@@ -23,7 +23,7 @@ export function QueryComposer({
   laterDate,
   query,
   running,
-  error,
+  validationError,
   statusLine,
   onEarlierChange,
   onLaterChange,
@@ -35,10 +35,7 @@ export function QueryComposer({
   const [bboxText, setBboxText] = useState("");
 
   return (
-    <div
-      className="absolute bottom-3 left-1/2 z-30 w-[min(920px,calc(100%-24px))] -translate-x-1/2"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
+    <div className="composer-wrap">
       {statusLine ? <p className="composer-status">{statusLine}</p> : null}
 
       <div data-testid="composer" className="glass composer-shell">
@@ -111,23 +108,30 @@ export function QueryComposer({
             />
           </div>
 
-          <div className="composer-segment border-l border-[var(--sq-line)] pl-3">
+          <div className="composer-segment composer-segment--run">
             <span className="composer-label sr-only">Run</span>
             <button
               type="submit"
               data-testid="composer-run"
-              className="btn-primary h-8 min-w-[108px] px-3"
+              className="btn-primary"
               disabled={running}
               aria-busy={running}
             >
-              {running ? "Running…" : "Run Analysis"}
+              {running ? (
+                <>
+                  <span className="btn-spinner" aria-hidden />
+                  Running…
+                </>
+              ) : (
+                "Run Analysis"
+              )}
             </button>
           </div>
         </form>
 
         {showBbox ? (
-          <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-[var(--sq-line)] pt-2">
-            <div className="flex min-w-[280px] flex-1 flex-col gap-1">
+          <div className="composer-bbox-row">
+            <div className="flex min-w-[260px] flex-1 flex-col gap-1">
               <label htmlFor="aoi-bbox" className="composer-label">
                 Bounding box (minLon, minLat, maxLon, maxLat)
               </label>
@@ -135,8 +139,7 @@ export function QueryComposer({
                 id="aoi-bbox"
                 data-testid="aoi-bbox"
                 type="text"
-                className="input-field w-full"
-                style={{ fontFamily: "var(--sq-font-mono)", fontSize: 12 }}
+                className="input-field input-field--mono w-full"
                 placeholder="77.56, 12.94, 77.60, 12.98"
                 value={bboxText}
                 onChange={(e) => setBboxText(e.target.value)}
@@ -144,19 +147,15 @@ export function QueryComposer({
                 autoComplete="off"
               />
             </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => onBboxSubmit(bboxText)}
-            >
+            <button type="button" className="btn-secondary" onClick={() => onBboxSubmit(bboxText)}>
               Set AOI
             </button>
           </div>
         ) : null}
 
-        {error ? (
-          <p className="mt-2 text-[11px] text-[var(--sq-danger)]" role="alert">
-            {error}
+        {validationError ? (
+          <p className="composer-error" role="alert" data-testid="composer-validation-error">
+            {validationError}
           </p>
         ) : null}
       </div>

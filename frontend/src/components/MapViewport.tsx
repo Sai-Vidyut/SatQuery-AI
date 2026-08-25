@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import maplibregl, { type GeoJSONSource, type Map } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import type { AOI, EvidenceRegion } from "@/types/domain";
-import { aoiFromBbox, bboxFromAoi, detectionFillOpacity } from "@/lib/geo";
+import { aoiFromBbox, bboxFromAoi, detectionFillOpacity, normalizeBbox } from "@/lib/geo";
 
 const SATELLITE_STYLE = {
   version: 8 as const,
@@ -28,6 +28,8 @@ const SATELLITE_STYLE = {
   ],
 };
 
+const MIN_AOI_SPAN = 0.0001;
+
 type LayerVisibility = {
   detections: boolean;
   aoi: boolean;
@@ -44,6 +46,31 @@ type Props = {
   mapRef?: MutableRefObject<Map | null>;
 };
 
+function draftFeatureFromBbox(bbox: [number, number, number, number]): FeatureCollection {
+  const [minLon, minLat, maxLon, maxLat] = bbox;
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [minLon, minLat],
+              [maxLon, minLat],
+              [maxLon, maxLat],
+              [minLon, maxLat],
+              [minLon, minLat],
+            ],
+          ],
+        },
+      },
+    ],
+  };
+}
+
 export function MapViewport({
   aoi,
   evidence,
@@ -57,7 +84,31 @@ export function MapViewport({
   const containerRef = useRef<HTMLDivElement>(null);
   const internalMapRef = useRef<Map | null>(null);
   const mapRef = externalMapRef ?? internalMapRef;
+  const drawingRef = useRef(false);
   const drawStartRef = useRef<[number, number] | null>(null);
+  const onAoiDrawnRef = useRef(onAoiDrawn);
+  onAoiDrawnRef.current = onAoiDrawn;
+
+  const setDraftBbox = useCallback(
+    (bbox: [number, number, number, number] | null) => {
+      const map = mapRef.current;
+      if (!map || !map.isStyleLoaded()) return;
+      const source = map.getSource("aoi-draft") as GeoJSONSource | undefined;
+      if (!source) return;
+      if (!bbox) {
+        source.setData({ type: "FeatureCollection", features: [] });
+        return;
+      }
+      source.setData(draftFeatureFromBbox(bbox));
+    },
+    [mapRef],
+  );
+
+  const clearDrawing = useCallback(() => {
+    drawingRef.current = false;
+    drawStartRef.current = null;
+    setDraftBbox(null);
+  }, [setDraftBbox]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -96,6 +147,30 @@ export function MapViewport({
         paint: {
           "line-color": "#c9a227",
           "line-width": 2,
+        },
+      });
+
+      map.addSource("aoi-draft", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: "aoi-draft-fill",
+        type: "fill",
+        source: "aoi-draft",
+        paint: {
+          "fill-color": "#c9a227",
+          "fill-opacity": 0.08,
+        },
+      });
+      map.addLayer({
+        id: "aoi-draft-line",
+        type: "line",
+        source: "aoi-draft",
+        paint: {
+          "line-color": "#c9a227",
+          "line-width": 2,
+          "line-dasharray": [2, 1],
         },
       });
 
@@ -182,6 +257,8 @@ export function MapViewport({
     const vis = layerVisibility.aoi ? "visible" : "none";
     map.setLayoutProperty("aoi-fill", "visibility", vis);
     map.setLayoutProperty("aoi-line", "visibility", vis);
+    map.setLayoutProperty("aoi-draft-fill", "visibility", vis);
+    map.setLayoutProperty("aoi-draft-line", "visibility", vis);
   }, [layerVisibility.aoi, mapRef]);
 
   useEffect(() => {
@@ -196,32 +273,107 @@ export function MapViewport({
     const map = mapRef.current;
     if (!map) return;
 
-    const onMouseDown = (e: maplibregl.MapMouseEvent) => {
-      if (!drawMode) return;
-      drawStartRef.current = [e.lngLat.lng, e.lngLat.lat];
+    if (drawMode) {
+      map.dragPan.disable();
+      map.boxZoom.disable();
+      map.doubleClickZoom.disable();
       map.getCanvas().style.cursor = "crosshair";
-    };
-
-    const onMouseUp = (e: maplibregl.MapMouseEvent) => {
-      if (!drawMode || !drawStartRef.current) return;
-      const [x0, y0] = drawStartRef.current;
-      const x1 = e.lngLat.lng;
-      const y1 = e.lngLat.lat;
-      drawStartRef.current = null;
+    } else {
+      map.dragPan.enable();
+      map.boxZoom.enable();
+      map.doubleClickZoom.enable();
       map.getCanvas().style.cursor = "";
+      clearDrawing();
+    }
+  }, [drawMode, clearDrawing, mapRef]);
 
-      const minLon = Math.min(x0, x1);
-      const maxLon = Math.max(x0, x1);
-      const minLat = Math.min(y0, y1);
-      const maxLat = Math.max(y0, y1);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !drawMode) return;
 
-      if (Math.abs(maxLon - minLon) < 0.0001 || Math.abs(maxLat - minLat) < 0.0001) return;
+    const canvas = map.getCanvas();
 
-      onAoiDrawn(aoiFromBbox([minLon, minLat, maxLon, maxLat]));
+    const lngLatFromPointer = (e: PointerEvent): [number, number] => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const ll = map.unproject([x, y]);
+      return [ll.lng, ll.lat];
     };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      drawingRef.current = true;
+      drawStartRef.current = lngLatFromPointer(e);
+      canvas.setPointerCapture(e.pointerId);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!drawingRef.current || !drawStartRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const [x0, y0] = drawStartRef.current;
+      const [x1, y1] = lngLatFromPointer(e);
+      setDraftBbox(normalizeBbox(x0, y0, x1, y1));
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (!drawingRef.current || !drawStartRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const [x0, y0] = drawStartRef.current;
+      const [x1, y1] = lngLatFromPointer(e);
+      const bbox = normalizeBbox(x0, y0, x1, y1);
+
+      drawingRef.current = false;
+      drawStartRef.current = null;
+      setDraftBbox(null);
+
+      if (canvas.hasPointerCapture(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+
+      const [minLon, minLat, maxLon, maxLat] = bbox;
+      if (maxLon - minLon < MIN_AOI_SPAN || maxLat - minLat < MIN_AOI_SPAN) {
+        return;
+      }
+
+      onAoiDrawnRef.current(aoiFromBbox(bbox));
+    };
+
+    const onPointerCancel = () => {
+      if (canvas.releasePointerCapture) {
+        try {
+          canvas.releasePointerCapture(0);
+        } catch {
+          // ignore if no capture
+        }
+      }
+      clearDrawing();
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDown, { capture: true });
+    canvas.addEventListener("pointermove", onPointerMove, { capture: true });
+    canvas.addEventListener("pointerup", onPointerUp, { capture: true });
+    canvas.addEventListener("pointercancel", onPointerCancel, { capture: true });
+
+    return () => {
+      canvas.removeEventListener("pointerdown", onPointerDown, { capture: true });
+      canvas.removeEventListener("pointermove", onPointerMove, { capture: true });
+      canvas.removeEventListener("pointerup", onPointerUp, { capture: true });
+      canvas.removeEventListener("pointercancel", onPointerCancel, { capture: true });
+      clearDrawing();
+    };
+  }, [drawMode, clearDrawing, setDraftBbox, mapRef]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || drawMode) return;
 
     const onDetectionClick = (e: maplibregl.MapLayerMouseEvent) => {
-      if (drawMode) return;
       const feature = e.features?.[0];
       const id = feature?.properties?.id;
       if (typeof id === "string") {
@@ -230,7 +382,6 @@ export function MapViewport({
     };
 
     const onMapClick = (e: maplibregl.MapMouseEvent) => {
-      if (drawMode) return;
       const hits = map.queryRenderedFeatures(e.point, {
         layers: ["detections-fill", "detections-line"],
       });
@@ -239,30 +390,20 @@ export function MapViewport({
       }
     };
 
-    map.on("mousedown", onMouseDown);
-    map.on("mouseup", onMouseUp);
     map.on("click", "detections-fill", onDetectionClick);
     map.on("click", onMapClick);
     map.on("mouseenter", "detections-fill", () => {
-      if (!drawMode) map.getCanvas().style.cursor = "pointer";
+      map.getCanvas().style.cursor = "pointer";
     });
     map.on("mouseleave", "detections-fill", () => {
-      if (!drawMode) map.getCanvas().style.cursor = "";
+      map.getCanvas().style.cursor = "";
     });
 
     return () => {
-      map.off("mousedown", onMouseDown);
-      map.off("mouseup", onMouseUp);
       map.off("click", "detections-fill", onDetectionClick);
       map.off("click", onMapClick);
     };
-  }, [drawMode, onAoiDrawn, onSelectRegion, mapRef]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.getCanvas().style.cursor = drawMode ? "crosshair" : "";
-  }, [drawMode, mapRef]);
+  }, [drawMode, onSelectRegion, mapRef]);
 
   const fitAoi = useCallback(() => {
     const map = mapRef.current;
@@ -285,27 +426,10 @@ export function MapViewport({
     <div
       ref={containerRef}
       data-testid="map"
+      data-draw-active={drawMode ? "true" : "false"}
       className="absolute inset-0 z-0 h-full w-full min-h-[50dvh]"
       role="application"
       aria-label="Satellite map"
     />
   );
-}
-
-export function useMapControls(mapRef: React.RefObject<Map | null>) {
-  return {
-    zoomIn: () => mapRef.current?.zoomIn(),
-    zoomOut: () => mapRef.current?.zoomOut(),
-    recenterAoi: (aoi: AOI | null) => {
-      if (!mapRef.current || !aoi) return;
-      const bbox = bboxFromAoi(aoi);
-      mapRef.current.fitBounds(
-        [
-          [bbox[0], bbox[1]],
-          [bbox[2], bbox[3]],
-        ],
-        { padding: { top: 48, bottom: 96, left: 56, right: 400 }, duration: 500 },
-      );
-    },
-  };
 }

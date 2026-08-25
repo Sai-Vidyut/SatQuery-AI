@@ -24,8 +24,17 @@ export function bboxFromAoi(aoi: AOI): [number, number, number, number] {
   return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
 }
 
+export function normalizeBbox(
+  minLon: number,
+  minLat: number,
+  maxLon: number,
+  maxLat: number,
+): [number, number, number, number] {
+  return [Math.min(minLon, maxLon), Math.min(minLat, maxLat), Math.max(minLon, maxLon), Math.max(minLat, maxLat)];
+}
+
 export function aoiFromBbox(bbox: [number, number, number, number]): AOI {
-  const [minLon, minLat, maxLon, maxLat] = bbox;
+  const [minLon, minLat, maxLon, maxLat] = normalizeBbox(bbox[0], bbox[1], bbox[2], bbox[3]);
   const geometry: GeoJSONGeometry = {
     type: "Polygon",
     coordinates: [

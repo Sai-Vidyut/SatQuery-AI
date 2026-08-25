@@ -24,7 +24,7 @@ function statusColor(status: TraceStep["status"]): string {
 function PlanQueryDetails({ metadata }: { metadata: TraceStep["metadata"] }) {
   if (!metadata || !isPlanQueryMetadata(metadata)) return null;
   return (
-    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--sq-text-muted)]">
+    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--sq-text-faint)]">
       {metadata.planner ? (
         <div className="flex justify-between gap-2">
           <dt>Planner</dt>
@@ -78,18 +78,16 @@ export function ExecutionTrace({ steps, loading }: Props) {
     return (
       <section
         data-testid="trace"
-        className="border-b border-[var(--sq-line)] px-3 py-2"
+        className="inspector-section"
         aria-live="polite"
         aria-label="Execution trace"
         aria-busy="true"
       >
-        <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--sq-text-muted)]">
-          Trace
-        </h2>
-        <ul className="space-y-1.5">
+        <p className="inspector-section__label">Trace</p>
+        <ul className="m-0 list-none space-y-1.5 p-0">
           {SKELETON_STEPS.map((name) => (
-            <li key={name} className="flex items-center gap-2 text-[12px] text-[var(--sq-text-faint)]">
-              <span className="inline-block h-1.5 w-1.5 shrink-0 bg-[var(--sq-text-faint)]" aria-hidden />
+            <li key={name} className="trace-row text-[var(--sq-text-faint)]">
+              <span className="trace-mark bg-[var(--sq-text-faint)]" aria-hidden />
               <span>{traceStepLabel({ id: name, tool_name: name, status: "running" })}</span>
             </li>
           ))}
@@ -103,18 +101,16 @@ export function ExecutionTrace({ steps, loading }: Props) {
   return (
     <section
       data-testid="trace"
-      className="border-b border-[var(--sq-line)] px-3 py-2"
+      className="inspector-section"
       aria-live="polite"
       aria-label="Execution trace"
     >
-      <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--sq-text-muted)]">
-        Trace
-      </h2>
-      <ul className="space-y-1.5">
+      <p className="inspector-section__label">Trace</p>
+      <ul className="m-0 list-none space-y-1.5 p-0">
         {steps.map((step) => (
-          <li key={step.id} className="flex items-start gap-2 text-[12px]">
+          <li key={step.id} className="trace-row">
             <span
-              className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0"
+              className="trace-mark"
               style={{ background: statusColor(step.status) }}
               aria-hidden
             />
@@ -122,24 +118,19 @@ export function ExecutionTrace({ steps, loading }: Props) {
               <div className="flex justify-between gap-2">
                 <span>{traceStepLabel(step)}</span>
                 {formatDuration(step.duration_ms) ? (
-                  <span
-                    className="tabular-nums text-[var(--sq-text-muted)]"
-                    style={{ fontFamily: "var(--sq-font-mono)", fontSize: 11 }}
-                  >
-                    {formatDuration(step.duration_ms)}
-                  </span>
+                  <span className="trace-row__duration">{formatDuration(step.duration_ms)}</span>
                 ) : null}
               </div>
               {step.tool_name === "plan_query" && step.metadata ? (
                 <PlanQueryDetails metadata={step.metadata} />
               ) : null}
               {step.error ? (
-                <p className="text-[11px] text-[var(--sq-danger)]">{step.error}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--sq-danger)]">{step.error}</p>
               ) : null}
               {step.summary &&
               step.tool_name !== "plan_query" &&
               !step.summary.toLowerCase().includes("running") ? (
-                <p className="text-[10px] text-[var(--sq-text-faint)]">{step.summary}</p>
+                <p className="mt-0.5 text-[10px] text-[var(--sq-text-faint)]">{step.summary}</p>
               ) : null}
             </div>
           </li>

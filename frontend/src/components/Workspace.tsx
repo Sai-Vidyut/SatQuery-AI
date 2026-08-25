@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Map } from "maplibre-gl";
 import type { AnalysisResult, AOI } from "@/types/domain";
 import { api } from "@/lib/api";
+import { parseIsoDate, validateDateRange } from "@/lib/dates";
+import { normalizeAnalysisError } from "@/lib/errors";
 import { aoiFromBbox, bboxFromAoi } from "@/lib/geo";
 import { MapViewport } from "@/components/MapViewport";
 import { MapToolCluster } from "@/components/MapToolCluster";
@@ -31,8 +33,8 @@ function applyUrlParams(params: URLSearchParams): {
 } {
   return {
     aoi: parseBboxParam(params.get("bbox")),
-    earlierDate: params.get("from") ?? DEFAULT_EARLIER_DATE,
-    laterDate: params.get("to") ?? DEFAULT_LATER_DATE,
+    earlierDate: parseIsoDate(params.get("from")) ?? DEFAULT_EARLIER_DATE,
+    laterDate: parseIsoDate(params.get("to")) ?? DEFAULT_LATER_DATE,
     query: params.get("q") ?? DEFAULT_QUERY,
     region: params.get("region"),
   };
@@ -48,7 +50,8 @@ export function Workspace() {
   const [laterDate, setLaterDate] = useState(DEFAULT_LATER_DATE);
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [statusLine, setStatusLine] = useState<string | null>(null);
@@ -88,8 +91,8 @@ export function Workspace() {
       } else {
         params.delete("bbox");
       }
-      params.set("from", nextFrom);
-      params.set("to", nextTo);
+      if (parseIsoDate(nextFrom)) params.set("from", nextFrom);
+      if (parseIsoDate(nextTo)) params.set("to", nextTo);
       params.set("q", nextQ);
       if (nextRegion) params.set("region", nextRegion);
       else params.delete("region");
@@ -101,33 +104,43 @@ export function Workspace() {
   );
 
   const handleRun = useCallback(async () => {
+    setValidationError(null);
+
     if (!aoi) {
-      setError("AOI required. Draw an area on the map or enter a bounding box.");
+      setValidationError("AOI required. Draw an area on the map or enter a bounding box.");
       return;
     }
     if (!query.trim()) {
-      setError("Query required.");
-      return;
-    }
-    if (laterDate <= earlierDate) {
-      setError("Later date must be after earlier date.");
+      setValidationError("Query required.");
       return;
     }
 
+    const dateError = validateDateRange(earlierDate, laterDate);
+    if (dateError) {
+      setValidationError(dateError);
+      return;
+    }
+
+    const payload = {
+      query,
+      aoi,
+      earlier_date: earlierDate,
+      later_date: laterDate,
+    };
+
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[SatQuery] submitQuery", payload);
+    }
+
     setRunning(true);
-    setError(null);
+    setAnalysisError(null);
     setResult(null);
     setSelectedRegionId(null);
     setStatusLine(null);
     runStartedAt.current = performance.now();
 
     try {
-      const data = await api.submitQuery({
-        query,
-        aoi,
-        earlier_date: earlierDate,
-        later_date: laterDate,
-      });
+      const data = await api.submitQuery(payload);
       const elapsed = runStartedAt.current
         ? ((performance.now() - runStartedAt.current) / 1000).toFixed(1)
         : "?";
@@ -137,7 +150,7 @@ export function Workspace() {
       );
       syncUrl({ region: null });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed.");
+      setAnalysisError(normalizeAnalysisError(err));
     } finally {
       setRunning(false);
       runStartedAt.current = null;
@@ -148,13 +161,13 @@ export function Workspace() {
     (text: string) => {
       const parts = text.split(",").map((p) => Number.parseFloat(p.trim()));
       if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) {
-        setError("Invalid bounding box. Use minLon, minLat, maxLon, maxLat.");
+        setValidationError("Invalid bounding box. Use minLon, minLat, maxLon, maxLat.");
         return;
       }
       const next = aoiFromBbox(parts as [number, number, number, number]);
       setAoi(next);
       setDrawMode(false);
-      setError(null);
+      setValidationError(null);
       syncUrl({ aoi: next });
     },
     [syncUrl],
@@ -206,7 +219,7 @@ export function Workspace() {
     ? `AOI · ${aoi.area_km2?.toFixed(1) ?? "?"} km²`
     : "Draw AOI";
 
-  const inspectorOpen = running || result != null || (error != null && !running);
+  const inspectorOpen = running || result != null || analysisError != null;
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden bg-[var(--sq-void)]">
@@ -227,6 +240,7 @@ export function Workspace() {
           onAoiDrawn={(next) => {
             setAoi(next);
             setDrawMode(false);
+            setValidationError(null);
             syncUrl({ aoi: next });
           }}
           onSelectRegion={handleSelectRegion}
@@ -240,7 +254,7 @@ export function Workspace() {
           data-testid="empty-hint"
           role="status"
         >
-          Draw an area to analyze
+          Draw an area to begin
         </div>
       ) : null}
 
@@ -255,6 +269,7 @@ export function Workspace() {
         onLayersChange={setLayerVisibility}
         onZoomIn={() => mapRef.current?.zoomIn()}
         onZoomOut={() => mapRef.current?.zoomOut()}
+        inspectorOpen={inspectorOpen}
       />
 
       {inspectorOpen ? (
@@ -262,14 +277,14 @@ export function Workspace() {
           result={result}
           selectedRegion={selectedRegion}
           running={running}
-          error={error}
+          analysisError={analysisError}
           onSelectRegion={(id) => handleSelectRegion(id)}
           onClose={() => {
             if (running) return;
             setResult(null);
             setSelectedRegionId(null);
             setStatusLine(null);
-            setError(null);
+            setAnalysisError(null);
             syncUrl({ region: null });
           }}
         />
@@ -281,14 +296,16 @@ export function Workspace() {
         laterDate={laterDate}
         query={query}
         running={running}
-        error={error}
+        validationError={validationError}
         statusLine={statusLine}
         onEarlierChange={(v) => {
           setEarlierDate(v);
+          setValidationError(null);
           syncUrl({ earlierDate: v });
         }}
         onLaterChange={(v) => {
           setLaterDate(v);
+          setValidationError(null);
           syncUrl({ laterDate: v });
         }}
         onQueryChange={(v) => {

@@ -8,7 +8,7 @@ type Props = {
   result: AnalysisResult | null;
   selectedRegion: EvidenceRegion | null;
   running: boolean;
-  error: string | null;
+  analysisError: string | null;
   onSelectRegion: (id: string) => void;
   onClose: () => void;
 };
@@ -29,11 +29,11 @@ export function EvidenceInspector({
   result,
   selectedRegion,
   running,
-  error,
+  analysisError,
   onSelectRegion,
   onClose,
 }: Props) {
-  if (!result && !running && !error) return null;
+  if (!result && !running && !analysisError) return null;
 
   const evidence = result?.evidence ?? [];
   const hasConstructionCandidates = evidence.some(
@@ -47,52 +47,47 @@ export function EvidenceInspector({
   return (
     <aside
       data-testid="inspector"
-      className="inspector-panel absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-96px)] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden rounded-md"
+      className="inspector-panel absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-88px)] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
       style={{ zIndex: 25 }}
     >
-      <header className="flex items-center justify-between border-b border-[var(--sq-line)] px-3 py-2">
-        <h2 className="text-[16px] font-medium">Results</h2>
-        <button
-          type="button"
-          className="border-0 bg-transparent px-0 text-[11px] text-[var(--sq-text-muted)] hover:text-[var(--sq-text)] focus-visible:outline-none focus-visible:[box-shadow:var(--sq-focus)]"
-          onClick={onClose}
-          aria-label="Close inspector"
-        >
+      <header className="inspector-header">
+        <h2 className="inspector-header__title">Results</h2>
+        <button type="button" className="inspector-close" onClick={onClose} aria-label="Close inspector">
           Close
         </button>
       </header>
 
       <ExecutionTrace steps={result?.trace ?? []} loading={running} />
 
-      {error && !running ? (
-        <div className="border-b border-[var(--sq-line)] px-3 py-2 text-[12px] text-[var(--sq-danger)]" role="alert">
-          {error}
+      {analysisError && !running ? (
+        <div className="inspector-section" role="alert" data-testid="inspector-analysis-error">
+          <p className="inspector-section__label">Error</p>
+          <p className="inspector-note inspector-note--error">{analysisError}</p>
         </div>
       ) : null}
 
       {result ? (
-        <div className="border-b border-[var(--sq-line)] px-3 py-2 text-[12px] text-[var(--sq-text-muted)]">
-          <p>{result.answer}</p>
+        <div className="inspector-section">
+          <p className="inspector-section__label">Answer</p>
+          <p className="inspector-answer">{result.answer}</p>
           {isPartialSemantic ? (
-            <p className="mt-1 text-[11px] text-[var(--sq-warning)]">
-              Partial evidence: spectral change detected without semantic construction support.
+            <p className="inspector-note inspector-note--warning">
+              Partial evidence: spectral change without semantic construction support.
             </p>
           ) : null}
           {evidence.length === 0 ? (
-            <p className="mt-1 text-[11px]">
+            <p className="inspector-note">
               No significant change in this AOI for the selected dates. Widen the date range or AOI.
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="inspector-section inspector-section--scroll">
         {result && evidence.length > 0 ? (
           <>
-            <h3 className="px-3 pt-2 text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--sq-text-muted)]">
-              Regions ({evidence.length})
-            </h3>
-            <ul role="listbox" aria-label="Detection regions">
+            <p className="inspector-section__label">Regions ({evidence.length})</p>
+            <ul role="listbox" aria-label="Detection regions" className="m-0 list-none p-0">
               {evidence.map((region) => (
                 <li key={region.id}>
                   <button
@@ -100,18 +95,11 @@ export function EvidenceInspector({
                     role="option"
                     aria-selected={selectedRegion?.id === region.id}
                     data-testid="region-row"
-                    className="flex w-full items-center justify-between border-b border-[var(--sq-line)] px-3 py-2 text-left hover:bg-[var(--sq-amber-dim)] focus-visible:outline-none focus-visible:[box-shadow:var(--sq-focus)]"
-                    style={{
-                      background:
-                        selectedRegion?.id === region.id ? "var(--sq-amber-dim)" : undefined,
-                    }}
+                    className="inspector-region-row"
                     onClick={() => onSelectRegion(region.id)}
                   >
-                    <span className="text-[13px]">{region.id}</span>
-                    <span
-                      className="tabular-nums text-[11px] text-[var(--sq-text-muted)]"
-                      style={{ fontFamily: "var(--sq-font-mono)" }}
-                    >
+                    <span>{region.id}</span>
+                    <span className="inspector-region-row__pct">
                       {Math.round(region.confidence * 100)}%
                     </span>
                   </button>
@@ -120,48 +108,61 @@ export function EvidenceInspector({
             </ul>
           </>
         ) : result && !running ? (
-          <p className="px-3 py-4 text-[12px] text-[var(--sq-text-muted)]">
-            No regions to display.
-          </p>
+          <p className="inspector-empty">No regions to display.</p>
         ) : null}
 
         {selectedRegion ? (
-          <div className="border-t border-[var(--sq-line)] px-3 py-2">
-            <h3 className="mb-2 text-[13px] font-medium">{selectedRegion.id}</h3>
+          <div className="inspector-section" style={{ borderBottom: "none", paddingTop: 0 }}>
+            <p className="inspector-section__label">Selected region</p>
+            <p
+              className="m-0 mb-2 text-[13px] font-medium"
+              style={{ fontFamily: "var(--sq-font-mono)" }}
+            >
+              {selectedRegion.id}
+            </p>
             <ConfidenceMeter confidence={selectedRegion.confidence} />
-            <dl className="mt-3 space-y-1">
-              <div className="flex justify-between text-[12px]">
-                <dt className="text-[var(--sq-text-muted)]">Modality</dt>
-                <dd style={{ fontFamily: "var(--sq-font-mono)" }}>{modalityLabel(selectedRegion)}</dd>
+
+            <p className="inspector-section__label" style={{ marginTop: 12 }}>
+              Metrics
+            </p>
+            <dl className="m-0">
+              <div className="inspector-metric-row">
+                <dt>Modality</dt>
+                <dd>{modalityLabel(selectedRegion)}</dd>
               </div>
-              <div className="flex justify-between text-[12px]">
-                <dt className="text-[var(--sq-text-muted)]">Claim</dt>
-                <dd style={{ fontFamily: "var(--sq-font-mono)" }}>{claimLabel(selectedRegion)}</dd>
-              </div>
-              <div className="flex justify-between text-[12px]">
-                <dt className="text-[var(--sq-text-muted)]">Provenance</dt>
-                <dd style={{ fontFamily: "var(--sq-font-mono)" }}>{selectedRegion.source}</dd>
+              <div className="inspector-metric-row">
+                <dt>Claim</dt>
+                <dd>{claimLabel(selectedRegion)}</dd>
               </div>
               {selectedRegion.metrics.map((m) => (
-                <div key={m.name} className="flex justify-between text-[12px]">
-                  <dt className="text-[var(--sq-text-muted)]">{m.name}</dt>
-                  <dd className="tabular-nums" style={{ fontFamily: "var(--sq-font-mono)" }}>
+                <div key={m.name} className="inspector-metric-row">
+                  <dt>{m.name}</dt>
+                  <dd>
                     {m.value}
                     {m.unit ? ` ${m.unit}` : ""}
                   </dd>
                 </div>
               ))}
             </dl>
+
+            <p className="inspector-section__label" style={{ marginTop: 12 }}>
+              Provenance
+            </p>
+            <p
+              className="m-0 text-[12px]"
+              style={{ fontFamily: "var(--sq-font-mono)", color: "var(--sq-text-muted)" }}
+            >
+              {selectedRegion.source}
+            </p>
+
             {hasConstructionCandidates && selectedRegion.metadata?.semantic_confidence != null ? (
-              <p className="mt-2 text-[11px] text-[var(--sq-text-muted)]">
+              <p className="inspector-note">
                 Semantic built-area evidence available for this region.
               </p>
             ) : null}
           </div>
         ) : result && evidence.length > 0 ? (
-          <p className="px-3 py-4 text-[12px] text-[var(--sq-text-muted)]">
-            Select a region on the map.
-          </p>
+          <p className="inspector-empty">Select a region on the map.</p>
         ) : null}
       </div>
     </aside>
