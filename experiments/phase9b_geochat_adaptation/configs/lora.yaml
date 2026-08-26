@@ -1,0 +1,107 @@
+# PLANNED LoRA/PEFT adaptation configuration for Phase 9C.
+#
+# NOTHING in this file has been executed. This documents the plan and the
+# reasoning behind each value, per the task's instruction not to invent
+# hyperparameters without justification.
+#
+# Compatibility check (documented, not yet empirically verified on GPU):
+# GeoChatLlamaForCausalLM subclasses transformers' LlamaForCausalLM and
+# reuses standard nn.Linear layers for q/k/v/o_proj and mlp (gate/up/down),
+# same as any LLaMA model peft's LoraConfig already targets by name. The
+# GeoChat repo's OWN scripts/finetune_lora.sh and scripts/finetune_qlora.sh
+# already use peft.LoraConfig against this exact architecture, so LoRA
+# compatibility is INFERRED from the upstream repo's existing training
+# scripts, not verified by us yet (no training has been run in this phase).
+
+method: "LoRA"
+qlora_considered: true
+qlora_decision: >
+  Standard LoRA (not QLoRA) is preferred for Phase 9C given the
+  recommended/alternative hardware (A100 40GB or L40S 24GB+) has enough
+  headroom to fine-tune in fp16 without 4-bit base-model quantization.
+  QLoRA (bitsandbytes 4-bit) remains a fallback ONLY if training must run
+  on the free-tier Kaggle T4x2 profile, where per-GPU 16GB is tight for
+  full fp16 gradients; bitsandbytes 4-bit is CUDA-only (unlike our Mac) so
+  it IS technically available in that environment, unlike Phase 9A's local
+  Apple Silicon blocker.
+
+target_modules:
+  # Standard LLaMA attention + MLP projections, matching GeoChat's own
+  # scripts/finetune_lora.sh convention (`--lora_target_modules` defaults
+  # to q_proj,k_proj,v_proj,o_proj in the upstream LLaVA/GeoChat trainer).
+  - "q_proj"
+  - "k_proj"
+  - "v_proj"
+  - "o_proj"
+  # mm_projector is intentionally NOT LoRA-adapted — the upstream repo
+  # keeps it either frozen or fully fine-tuned (not LoRA), since it is
+  # small (~a few million params) and central to vision-language alignment.
+
+rank: 16
+alpha: 32
+dropout: 0.05
+rationale: >
+  rank=16, alpha=32 (2x rank) is the LoRA paper's and PEFT's most common
+  default for 7B LLaMA-family fine-tunes, and matches GeoChat's own
+  finetune_lora.sh default (--lora_r 128 for full domain adaptation is
+  their large-scale setting; we start smaller at 16 for a PROOF-OF-CONCEPT
+  on a small BigEarthNet.txt subset, not full-dataset retraining).
+  dropout=0.05 is the standard PEFT default for LoRA on causal LMs.
+
+trainable_param_estimate:
+  # 4 target modules x 32 layers x (rank * in_dim + rank * out_dim)
+  # q/k/v/o_proj are each 4096x4096 in GeoChat-7B (num_attention_heads=32,
+  # num_key_value_heads=32 -> no GQA, so k/v_proj are also 4096x4096).
+  formula: "4 modules * 32 layers * 2 * rank * 4096"
+  with_rank_16: 16_777_216  # ~16.8M trainable params (~0.24% of 7B)
+  note: "Computed analytically from config.json dims (VERIFIED shapes, INFERRED total since no training run yet)."
+
+learning_rate: 2.0e-4
+lr_rationale: >
+  Standard LoRA learning rate for 7B LLaMA fine-tunes (an order of
+  magnitude higher than full fine-tuning's 2e-5, which is what GeoChat's
+  own README documents for full fine-tuning). LoRA papers and PEFT
+  cookbooks consistently use 1e-4 to 3e-4 for this parameter count.
+
+batch_size: 1
+gradient_accumulation_steps: 16
+effective_batch_size: 16
+batch_size_rationale: >
+  Per-sample 504x504 image forward pass + 7B LLM makes batch_size=1 the
+  safe starting point on a single 24-40GB GPU; gradient accumulation
+  recovers a reasonable effective batch size without additional VRAM.
+
+image_resolution_px: 504
+epochs_or_steps:
+  proof_of_concept_steps: 200
+  rationale: >
+    A proof-of-concept run should demonstrate the adaptation pipeline
+    works end-to-end (loss decreases, checkpoint saves/loads, eval runs),
+    not achieve benchmark performance. 200 steps at effective batch 16 =
+    3,200 examples seen, well within a small BigEarthNet.txt subset
+    (see configs/dataset.yaml).
+
+checkpoint_strategy:
+  save_every_n_steps: 50
+  save_total_limit: 3
+  save_adapter_only: true
+  rationale: >
+    LoRA adapters are small (tens of MB, not GBs), so frequent checkpoints
+    are cheap. save_adapter_only avoids re-saving the frozen 14GB base
+    model at every checkpoint (matches GeoChat's own
+    scripts/merge_lora_weights.py workflow: train adapter-only, merge once
+    at the end).
+
+expected_vram_gb:
+  a100_40gb_profile: "~20-26 (see configs/cloud.yaml memory budget)"
+  kaggle_t4x2_profile: "~14-16 per GPU if sharded; QLoRA fallback recommended here"
+
+estimated_runtime:
+  basis: "NOT measured — no training run has occurred in Phase 9A or 9B."
+  order_of_magnitude_reasoning: >
+    GeoChat's own README states full fine-tuning of the 7B model takes
+    ~25 hours on 3x A100 40GB for the FULL training dataset. A 200-step
+    LoRA proof-of-concept on a small subset, on a single A100, is expected
+    to be on the order of 15-45 minutes, but this is an ESTIMATE, not a
+    measurement, and must be validated empirically in Phase 9C before
+    being trusted.

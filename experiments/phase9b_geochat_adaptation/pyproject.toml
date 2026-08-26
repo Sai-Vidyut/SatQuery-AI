@@ -1,0 +1,64 @@
+[project]
+name = "phase9b-geochat-adaptation"
+version = "0.1.0"
+description = "SatQuery AI Phase 9B — cloud GeoChat-7B adaptation experiment (research only, not imported by backend/frontend)"
+requires-python = ">=3.11"
+readme = "README.md"
+
+# Split into groups: `base` runs anywhere (config, dataset metadata, tests).
+# `cloud` additionally requires a CUDA GPU and is only installed on the
+# cloud GPU environment (Kaggle/Colab/etc.) for the actual smoke test.
+dependencies = [
+    "pydantic>=2.10.0",
+    "pyyaml>=6.0",
+    "pillow>=10.0.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+]
+metadata = [
+    # Needed only to read BigEarthNet.txt.parquet directly; the small-sample
+    # workflow uses the HF datasets-server REST API instead and does not
+    # require these.
+    "pandas>=2.2.0",
+    "pyarrow>=17.0.0",
+    "huggingface_hub>=0.25.0",
+]
+earth_engine = [
+    "earthengine-api>=1.4.0",
+]
+# Cloud GPU smoke-test dependencies. Pinned to match GeoChat-7B's
+# LLaVA-1.5-era custom modeling code (see README "Exact dependency versions").
+# NOT installed locally on the 16GB Mac — install only inside the cloud
+# notebook/session per README "Cloud setup".
+cloud = [
+    # torch/torchvision intentionally NOT pinned to an exact version here:
+    # Kaggle/Colab ship a preinstalled CUDA-matched torch build, and forcing
+    # a different version risks breaking the CUDA/driver linkage. Require a
+    # floor only; document the actual resolved version in the smoke-test
+    # result (see README "Exact dependency versions").
+    "torch>=2.1.0",
+    "torchvision>=0.16.0",
+    "transformers==4.36.2",
+    "accelerate==0.25.0",
+    "tokenizers>=0.14,<0.19",
+    "sentencepiece==0.1.99",
+    "einops==0.6.1",
+    "einops-exts==0.0.4",
+    "peft==0.7.1",
+    "psutil>=5.9.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

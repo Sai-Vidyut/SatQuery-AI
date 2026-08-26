@@ -1,0 +1,2 @@
+[console_scripts]
+geochat-service = geochat_service.main:main

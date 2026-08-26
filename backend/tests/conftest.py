@@ -11,8 +11,13 @@ def force_development_providers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("IMAGERY_PROVIDER", "development")
     monkeypatch.setenv("CHANGE_DETECTOR", "development")
     monkeypatch.setenv("SEMANTIC_ANALYZER", "development")
+    monkeypatch.setenv("GEOCHAT_VQA_PROVIDER", "development")
     from app.core.config import get_settings
 
     get_settings.cache_clear()
+    from app.adapters.rsvlm.factory import get_geochat_vlm
+
+    get_geochat_vlm.cache_clear()
     yield
+    get_geochat_vlm.cache_clear()
     get_settings.cache_clear()

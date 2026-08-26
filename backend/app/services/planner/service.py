@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from app.core.config import get_settings
 from app.core.errors import SatQueryError
 from app.schemas.domain import QueryRequest
+from app.schemas.input import ImageModality
 from app.schemas.planning import FORBIDDEN_PLAN_FIELDS, PlanQueryOutput, QueryAnalysisPlan
 from app.services.planner.deterministic import build_deterministic_plan
 from app.services.planner.registry import validate_tool_names
@@ -78,27 +79,48 @@ def _system_prompt() -> str:
 
 
 def _user_prompt(request: QueryRequest) -> str:
-    return json.dumps(
-        {
-            "query": request.query,
-            "earlier_date": request.earlier_date.isoformat(),
-            "later_date": request.later_date.isoformat(),
-            "allowed_tools": [
-                "fetch_imagery",
-                "detect_change",
-                "analyze_semantics",
-                "detect_sar_change",
-                "fuse_evidence",
-                "generate_evidence",
-            ],
-            "allowed_intents": [
-                "spectral_change",
-                "construction",
-                "radar_change",
-                "multimodal_comparison",
-            ],
-        }
-    )
+    payload: dict[str, object] = {
+        "query": request.query,
+        "allowed_tools": [
+            "fetch_imagery",
+            "detect_change",
+            "analyze_semantics",
+            "detect_sar_change",
+            "fuse_evidence",
+            "generate_evidence",
+            "geochat_vqa",
+            "geochat_caption",
+            "change_understanding",
+            "optical_analysis",
+            "sar_analysis",
+            "cross_modal_fusion",
+        ],
+        "allowed_intents": [
+            "spectral_change",
+            "construction",
+            "radar_change",
+            "multimodal_comparison",
+            "single_image_vqa",
+            "single_image_caption",
+            "bi_temporal_change_vqa",
+            "cross_modal_optical_sar",
+        ],
+    }
+    if request.is_cross_modal_upload:
+        payload["input_mode"] = "cross_modal_upload"
+        payload["optical_image_id"] = request.optical_image_id
+        payload["sar_image_id"] = request.sar_image_id
+    elif request.is_bi_temporal_upload:
+        payload["input_mode"] = "bi_temporal_upload"
+        payload["earlier_image_id"] = request.earlier_image_id
+        payload["later_image_id"] = request.later_image_id
+    elif request.is_single_image_vqa:
+        payload["input_mode"] = "single_image"
+        payload["image_id"] = request.image_id
+    else:
+        payload["earlier_date"] = request.earlier_date.isoformat() if request.earlier_date else None
+        payload["later_date"] = request.later_date.isoformat() if request.later_date else None
+    return json.dumps(payload)
 
 
 async def plan_with_llm(
@@ -123,11 +145,12 @@ async def plan_query(
     request: QueryRequest,
     *,
     llm_client: LLMPlannerClient | None = None,
+    image_modality: ImageModality | None = None,
 ) -> PlanQueryOutput:
     settings = get_settings()
-    if settings.query_planner != "llm":
+    if settings.query_planner != "llm" or request.is_single_image_vqa or request.is_bi_temporal_upload or request.is_cross_modal_upload:
         return PlanQueryOutput(
-            plan=build_deterministic_plan(request),
+            plan=build_deterministic_plan(request, image_modality=image_modality),
             planner="deterministic",
             fallback_used=False,
         )
@@ -135,7 +158,7 @@ async def plan_query(
     client = llm_client or get_llm_client()
     if client is None:
         return PlanQueryOutput(
-            plan=build_deterministic_plan(request),
+            plan=build_deterministic_plan(request, image_modality=image_modality),
             planner="deterministic",
             fallback_used=True,
         )
@@ -145,7 +168,7 @@ async def plan_query(
         return PlanQueryOutput(plan=plan, planner="llm", fallback_used=False)
     except (ValidationError, ValueError, SatQueryError, httpx.HTTPError, KeyError, json.JSONDecodeError):
         return PlanQueryOutput(
-            plan=build_deterministic_plan(request),
+            plan=build_deterministic_plan(request, image_modality=image_modality),
             planner="deterministic",
             fallback_used=True,
         )

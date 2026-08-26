@@ -1,0 +1,48 @@
+# GeoChat-7B model configuration.
+#
+# All values below are VERIFIED against the actual model card / config.json
+# fetched during Phase 9A (see experiments/phase9a_geochat_smoketest/).
+
+model:
+  name: "MBZUAI/geochat-7B"
+  revision: "cca91eb4c40d833c60579a5af95a7514181fe291"  # pinned commit SHA (from HF API, Phase 9A)
+  architecture_class: "GeoChatLlamaForCausalLM"
+  base_llm: "vicuna-7b (llama architecture, 32 layers, hidden_size=4096, vocab=32000)"
+  license: "apache-2.0"
+  torch_dtype: "float16"
+  weights_total_bytes: 14126079376  # 9976634558 + 4149444818, verified in Phase 9A
+  source_repo: "https://github.com/mbzuai-oryx/GeoChat"
+  source_repo_pinned_note: >
+    The official repo's own pyproject.toml pins torch==2.0.1,
+    transformers==4.31.0. We instead use transformers==4.36.2 (still legacy
+    tuple-based KV cache, still compatible with the custom
+    GeoChatLlamaForCausalLM.forward signature) because 4.31 wheels are
+    impractical to source in 2026. Verified importable in Phase 9A.
+
+vision_tower:
+  name: "openai/clip-vit-large-patch14-336"
+  interpolated_to_px: 504  # GeoChat interpolates CLIP position embeddings to 504x504
+  select_layer: -2
+  select_feature: "patch"
+  weights_total_bytes: 1710000000  # approx, verified downloadable in Phase 9A
+
+projector:
+  type: "mlp2x_gelu"
+  mm_hidden_size: 1024
+
+tokenizer:
+  vocab_size: 32000
+  mm_use_im_patch_token: false
+  mm_use_im_start_end: false
+  image_token: "<image>"
+  image_token_index: -200
+
+prompt_template:
+  # Matches geochat/conversation.py conv_vicuna_v1 style used by geochat_demo.py
+  system: >
+    A chat between a curious user and an artificial intelligence assistant.
+    The assistant gives helpful, detailed, and polite answers to the user's
+    questions.
+  user_role: "USER"
+  assistant_role: "ASSISTANT"
+  format: "{system} USER: <image>\n{question} ASSISTANT:"

@@ -11,6 +11,12 @@ TOOL_DESCRIPTIONS: dict[PlannerToolName, str] = {
     PlannerToolName.DETECT_SAR_CHANGE: "Fetch Sentinel-1 imagery and run SAR change detection.",
     PlannerToolName.FUSE_EVIDENCE: "Fuse optical, semantic, and SAR evidence deterministically.",
     PlannerToolName.GENERATE_EVIDENCE: "Validate fused evidence and compute aggregate metrics.",
+    PlannerToolName.GEOCHAT_VQA: "Run GeoChat-7B single-image visual question answering.",
+    PlannerToolName.GEOCHAT_CAPTION: "Run GeoChat-7B single-image scene description / captioning.",
+    PlannerToolName.CHANGE_UNDERSTANDING: "Interpret bi-temporal CVA output for the user question.",
+    PlannerToolName.OPTICAL_ANALYSIS: "Analyze uploaded optical/multispectral imagery for cross-modal cues.",
+    PlannerToolName.SAR_ANALYSIS: "Analyze uploaded SAR imagery for cross-modal cues.",
+    PlannerToolName.CROSS_MODAL_FUSION: "Fuse uploaded optical and SAR analyses into joint evidence.",
 }
 
 

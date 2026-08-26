@@ -47,12 +47,13 @@ test.describe("SatQuery flagship flow", () => {
     await expect(page.getByTestId("inspector")).toBeVisible();
     await expect(page.getByTestId("trace")).toBeVisible();
 
-    const regions = page.getByTestId("region-row");
+    const inspector = page.getByTestId("inspector");
+    const regions = inspector.getByTestId("region-row");
     await expect(regions.first()).toBeVisible({ timeout: 15_000 });
     expect(await regions.count()).toBeGreaterThanOrEqual(1);
 
-    await regions.first().click();
-    await expect(page.getByTestId("confidence").first()).toBeVisible();
+    await expect(inspector.getByText(/Regions \(\d+\)/)).toBeVisible();
+    await expect(page.locator(".inspector-answer")).toContainText(/confidence/i);
     await expect(page.getByTestId("map")).toBeVisible();
   });
 

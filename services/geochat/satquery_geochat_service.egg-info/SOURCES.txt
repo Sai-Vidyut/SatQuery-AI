@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+geochat_service/__init__.py
+geochat_service/config.py
+geochat_service/inference.py
+geochat_service/main.py
+geochat_service/patches.py
+geochat_service/preprocessing.py
+geochat_service/schemas.py
+satquery_geochat_service.egg-info/PKG-INFO
+satquery_geochat_service.egg-info/SOURCES.txt
+satquery_geochat_service.egg-info/dependency_links.txt
+satquery_geochat_service.egg-info/entry_points.txt
+satquery_geochat_service.egg-info/requires.txt
+satquery_geochat_service.egg-info/top_level.txt
+tests/test_service_api.py

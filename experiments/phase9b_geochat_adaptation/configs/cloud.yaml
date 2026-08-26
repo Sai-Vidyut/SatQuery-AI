@@ -1,0 +1,101 @@
+# Cloud hardware profiles for Phase 9B.
+#
+# Memory budget reasoning (why 16GB alone is not treated as "automatically
+# sufficient", per the task's explicit instruction):
+#
+#   component                          size (fp16)
+#   ----------------------------------  -----------
+#   LLaMA-7B weights                    ~13.0 GB
+#   CLIP ViT-L/14-336 vision tower       ~1.7 GB
+#   mm_projector (mlp2x_gelu)            ~0.03 GB
+#   -----------------------------------  -----------
+#   model weights subtotal               ~14.7 GB
+#   + CUDA context / framework overhead  ~0.5-1.5 GB (driver, cuBLAS, allocator)
+#   + activations for a single 504x504 image forward pass + short generation
+#     (batch=1, ~300 tokens KV cache)    ~0.5-1.5 GB
+#   -----------------------------------  -----------
+#   INFERENCE total                      ~16-18 GB
+#
+#   LoRA/PEFT training adds (rank 16-64, attention+MLP projections):
+#   + optimizer states for trainable LoRA params (AdamW, fp32 states)  ~0.1-0.3 GB
+#   + gradient + activation memory for backward pass (batch=1-4,
+#     504x504 image, grad checkpointing recommended)                  ~4-8 GB
+#   -----------------------------------  -----------
+#   LORA TRAINING total                  ~20-26 GB
+#
+# A single 16GB GPU (T4) has ~15GB usable VRAM after ECC reservation, which
+# is BELOW the inference total before any training memory is added. This is
+# why the task explicitly rules out assuming a T4 is sufficient on its own.
+
+profiles:
+  recommended:
+    gpu: "NVIDIA A100 40GB (or 80GB)"
+    vram_gb: 40
+    rationale: >
+      Comfortable headroom for fp16 inference (~16-18GB) AND LoRA training
+      (~20-26GB) in the same environment without falling back to
+      gradient checkpointing tricks or CPU offload. This is the profile the
+      task asks us to prefer.
+    known_sources:
+      - "Lambda Cloud (on-demand, paid, no free tier)"
+      - "RunPod (on-demand, paid, no free tier)"
+      - "Google Colab Pay-As-You-Go / Pro+ (paid, A100 subject to availability)"
+    cost_note: >
+      All A100 access paths are PAID. This conflicts with the project's
+      documented ₹0 budget constraint (AGENTS.md). Recommended only if the
+      user explicitly accepts a small paid cost for Phase 9B/9C.
+
+  alternative:
+    gpu: "NVIDIA L40S 48GB (or any 24GB+ single GPU: A10, RTX 6000 Ada, etc.)"
+    vram_gb: 24
+    rationale: >
+      24GB comfortably covers inference (~16-18GB) with real headroom, and
+      covers LoRA training with rank<=32, batch=1-2, and gradient
+      checkpointing enabled. Still a paid on-demand instance on all known
+      providers as of Aug 2026.
+    known_sources:
+      - "RunPod, Lambda, Colab Pro+/PAYG (all paid)"
+
+  free_tier_used_for_this_experiment:
+    gpu: "Kaggle Notebooks — 'GPU T4 x2' (two NVIDIA T4, 16GB each, 32GB combined)"
+    vram_gb: 32
+    per_gpu_vram_gb: 16
+    rationale: >
+      This is NOT a single 24GB+ GPU (explicitly what the task warns
+      against assuming is "automatically sufficient" for a SINGLE T4).
+      However, two independent 16GB T4s let transformers'
+      `device_map="auto"` (via accelerate) SHARD the model across both
+      GPUs, so no single GPU needs to hold the full ~15GB of weights alone.
+      This gives ~32GB of combined pooled memory for the INFERENCE smoke
+      test only. It is explicitly NOT recommended for LoRA training runs,
+      where per-GPU memory (not pooled memory) matters more for gradient/
+      optimizer state unless using a distributed training strategy (FSDP /
+      DeepSpeed ZeRO), which is out of scope for Phase 9B.
+    quota: "30 GPU-hours/week, 12-hour session cap (documented Aug 2026)"
+    cost: "Free (no credit card required)"
+    access_method: >
+      Kaggle CLI (`kaggle kernels push`) using a personal API token
+      (KAGGLE_USERNAME / KAGGLE_KEY env vars, generated at
+      kaggle.com/settings — never hardcoded, never committed).
+    verified_in_this_phase: false  # set true only after an actual run succeeds
+
+  free_tier_alternative:
+    gpu: "Google Colab Free — NVIDIA T4 (single GPU, ~15GB usable)"
+    vram_gb: 15
+    rationale: >
+      A single T4 (~15GB usable) is BELOW our own inference budget estimate
+      (~16-18GB) once CUDA context and generation activations are included.
+      Likely to OOM or require 8-bit loading. Documented for completeness,
+      not selected as primary due to this margin risk plus unpredictable
+      free-tier GPU assignment (not guaranteed, per Google's own FAQ).
+    quota: "Dynamic, unpublished, ~15-30 GPU-hours/week (not guaranteed)"
+    cost: "Free (no credit card required)"
+
+selected_for_phase_9b: "free_tier_used_for_this_experiment"
+selection_reason: >
+  Satisfies the task's explicit preference for a free/low-cost initial
+  smoke test while providing genuinely more headroom (32GB pooled across
+  2 GPUs) than a single T4, avoiding the specific pitfall the task warns
+  about. The A100/L40S profiles remain the documented recommendation for
+  Phase 9C (LoRA training), which will require a paid environment — that
+  decision is deferred to the user, not made silently here.

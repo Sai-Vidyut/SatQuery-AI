@@ -4,12 +4,26 @@ import asyncio
 from datetime import UTC, datetime
 from time import perf_counter
 
+from app.adapters.change.deterministic import DeterministicChangeDetector
+from app.adapters.imagery.uploaded.bi_temporal_bridge import build_change_detection_input
+from app.adapters.imagery.uploaded.cross_modal_bridge import (
+    build_cross_modal_imagery_result,
+    pair_bounds,
+)
+from app.adapters.imagery.uploaded.compatibility import (
+    resolve_co_registration_status,
+    validate_bi_temporal,
+    validate_optical_sar_pair,
+    validate_single_image,
+)
+from app.adapters.imagery.uploaded.factory import get_uploaded_imagery_provider
 from app.core.errors import SatQueryError
 from app.evidence.engine import EvidenceEngine
 from app.schemas.domain import (
     AnalysisResult,
     AnalysisStatus,
     ChangeDetectionInput,
+    DataMode,
     DetectSARChangeInput,
     FetchImageryInput,
     FuseEvidenceInput,
@@ -21,16 +35,37 @@ from app.schemas.domain import (
     TraceStatus,
     TraceStep,
 )
-from app.schemas.planning import QueryAnalysisPlan, SensorRequirement
+from app.schemas.change_understanding import ChangeUnderstandingToolInput
+from app.schemas.input import ImageInput, ImageModality, InputValidationResult
+from app.schemas.planning import QueryAnalysisPlan, QueryIntent, SensorRequirement
+from app.schemas.vqa import (
+    GeoChatCaptionInput,
+    GeoChatCaptionParameters,
+    GeoChatVQAInput,
+    GeoChatVQAParameters,
+)
 from app.services.answer_engine import AnswerEngine
 from app.services.planner.service import plan_query
 from app.services.session_store import SessionStore, session_store
+from app.schemas.cross_modal import (
+    CrossModalFusionInput,
+    OpticalAnalysisInput,
+    SARAnalysisInput,
+)
+from app.services.cross_modal_pipeline import build_cross_modal_metrics, build_cross_modal_result
+from app.tools.single_image.geochat_caption import GeoChatCaptionTool
+from app.tools.single_image.geochat_vqa import GeoChatVQATool
 from app.tools.evidence.fuse_evidence import FuseEvidenceTool
 from app.tools.evidence.generate_evidence import GenerateEvidenceTool
 from app.tools.imagery.fetch_imagery import FetchImageryTool
 from app.tools.semantic.analyze_semantics import AnalyzeSemanticsTool
 from app.tools.temporal.detect_change import DetectChangeTool
 from app.tools.temporal.detect_sar_change import DetectSARChangeTool
+from app.services.vqa_pipeline import build_caption_metrics, build_vqa_metrics
+from app.tools.temporal.change_understanding import ChangeUnderstandingTool
+from app.tools.cross_modal.cross_modal_fusion import CrossModalFusionTool
+from app.tools.cross_modal.optical_analysis import UploadedOpticalAnalysisTool
+from app.tools.cross_modal.sar_analysis import UploadedSARAnalysisTool
 
 
 class QueryController:
@@ -38,14 +73,323 @@ class QueryController:
         self._store = store or session_store
         self._fetch = FetchImageryTool()
         self._detect = DetectChangeTool()
+        self._upload_detect = DetectChangeTool(detector=DeterministicChangeDetector())
         self._detect_sar = DetectSARChangeTool()
         self._semantic = AnalyzeSemanticsTool()
         self._fuse = FuseEvidenceTool()
         self._evidence_tool = GenerateEvidenceTool()
         self._evidence = EvidenceEngine()
         self._answer = AnswerEngine()
+        self._geochat_vqa = GeoChatVQATool()
+        self._geochat_caption = GeoChatCaptionTool()
+        self._change_understanding = ChangeUnderstandingTool()
+        self._optical_analysis = UploadedOpticalAnalysisTool()
+        self._sar_analysis = UploadedSARAnalysisTool()
+        self._cross_modal_fusion = CrossModalFusionTool()
 
     async def submit(self, request: QueryRequest) -> AnalysisResult:
+        if request.is_cross_modal_upload:
+            return await self._submit_cross_modal_optical_sar(request)
+        if request.is_bi_temporal_upload:
+            return await self._submit_bi_temporal_change(request)
+        if request.is_single_image_vqa:
+            return await self._submit_single_image(request)
+        return await self._submit_temporal_analysis(request)
+
+    async def _submit_cross_modal_optical_sar(self, request: QueryRequest) -> AnalysisResult:
+        session_id = self._store.create()
+        trace: list[TraceStep] = []
+        optical_id = request.optical_image_id
+        sar_id = request.sar_image_id
+        if not optical_id or not sar_id:
+            raise SatQueryError(
+                "invalid_request",
+                "optical_image_id and sar_image_id are required for cross-modal analysis.",
+                status_code=400,
+            )
+
+        try:
+            provider = get_uploaded_imagery_provider()
+            for image_id in (optical_id, sar_id):
+                if not provider.exists(image_id):
+                    raise SatQueryError(
+                        "image_not_found",
+                        f"Unknown image_id: {image_id}",
+                        status_code=404,
+                    )
+            optical = provider.get(optical_id)
+            sar = provider.get(sar_id)
+
+            validation = await self._run_cross_modal_validation_step(trace, optical, sar)
+            if not validation.valid:
+                self._store.update_trace(session_id, trace)
+                raise SatQueryError(
+                    "input_validation_failed",
+                    "; ".join(validation.errors) or "Cross-modal input validation failed.",
+                    status_code=400,
+                )
+
+            plan_output = await self._run_plan_step(trace, request)
+            plan = plan_output.plan
+            if plan.user_intent != QueryIntent.CROSS_MODAL_OPTICAL_SAR:
+                raise SatQueryError(
+                    "planner_routing_error",
+                    f"Expected cross_modal_optical_sar intent, got {plan.user_intent.value}.",
+                    status_code=500,
+                )
+
+            bounds = pair_bounds(optical, sar)
+            co_registration_status, co_registration_provenance = resolve_co_registration_status(
+                optical, sar
+            )
+
+            optical_summary = await self._run_optical_analysis_step(
+                trace, request, optical, bounds, plan
+            )
+            sar_summary = await self._run_sar_analysis_step(trace, request, sar, bounds, plan)
+            fused_summary, fused_regions = await self._run_cross_modal_fusion_step(
+                trace,
+                request,
+                optical,
+                sar,
+                optical_summary,
+                sar_summary,
+                bounds,
+                co_registration_status,
+                plan,
+            )
+            evidence_out = await self._run_cross_modal_generate_evidence_step(
+                trace,
+                request,
+                optical,
+                sar,
+                fused_regions,
+            )
+
+            cross_modal_result = build_cross_modal_result(
+                request,
+                optical=optical_summary,
+                sar=sar_summary,
+                fused=fused_summary,
+                co_registration_status=co_registration_status,
+                co_registration_provenance=co_registration_provenance,
+                optical_image_id=optical_id,
+                sar_image_id=sar_id,
+                fused_regions_count=len(fused_regions),
+            )
+            answer = self._answer.compose_cross_modal(request, cross_modal_result)
+            metrics = build_cross_modal_metrics(cross_modal_result) + evidence_out.metrics
+
+            result = AnalysisResult(
+                status=AnalysisStatus.COMPLETED,
+                session_id=session_id,
+                answer=answer,
+                confidence=0.0,
+                confidence_available=False,
+                metrics=metrics,
+                evidence=evidence_out.regions,
+                trace=trace,
+                mode=DataMode.DEVELOPMENT,
+                cross_modal=cross_modal_result,
+            )
+            self._store.complete(session_id, result)
+            return result
+        except SatQueryError:
+            raise
+        except Exception as exc:
+            self._fail_trace(trace, exc)
+            raise SatQueryError("analysis_failed", str(exc), status_code=500) from exc
+
+    async def _submit_bi_temporal_change(self, request: QueryRequest) -> AnalysisResult:
+        session_id = self._store.create()
+        trace: list[TraceStep] = []
+        earlier_id = request.earlier_image_id
+        later_id = request.later_image_id
+        if not earlier_id or not later_id:
+            raise SatQueryError(
+                "invalid_request",
+                "earlier_image_id and later_image_id are required for bi-temporal change analysis.",
+                status_code=400,
+            )
+
+        try:
+            provider = get_uploaded_imagery_provider()
+            for image_id in (earlier_id, later_id):
+                if not provider.exists(image_id):
+                    raise SatQueryError(
+                        "image_not_found",
+                        f"Unknown image_id: {image_id}",
+                        status_code=404,
+                    )
+            earlier = provider.get(earlier_id)
+            later = provider.get(later_id)
+
+            validation = await self._run_bi_temporal_validation_step(trace, earlier, later)
+            if not validation.valid:
+                self._store.update_trace(session_id, trace)
+                raise SatQueryError(
+                    "input_validation_failed",
+                    "; ".join(validation.errors) or "Bi-temporal input validation failed.",
+                    status_code=400,
+                )
+
+            plan_output = await self._run_plan_step(trace, request)
+            plan = plan_output.plan
+            if plan.user_intent != QueryIntent.BI_TEMPORAL_CHANGE_VQA:
+                raise SatQueryError(
+                    "planner_routing_error",
+                    f"Expected bi_temporal_change_vqa intent, got {plan.user_intent.value}.",
+                    status_code=500,
+                )
+
+            detections = await self._run_uploaded_detect_change_step(trace, earlier, later, plan)
+            regions = [
+                r.model_copy(
+                    update={
+                        "metadata": {
+                            **r.metadata,
+                            "evidence_type": "spectral_change",
+                            "evidence_modality": "optical",
+                            "claim_type": "none",
+                        }
+                    }
+                )
+                for r in detections.regions
+            ]
+            understanding = await self._run_change_understanding_step(
+                trace, request, earlier, later, detections, plan
+            )
+            evidence_out = await self._run_bi_temporal_generate_evidence_step(
+                trace,
+                request,
+                detections,
+                regions,
+                earlier=earlier,
+                later=later,
+            )
+
+            answer = self._answer.compose_bi_temporal_change(request, understanding.result)
+            confidence = (
+                understanding.result.confidence
+                if understanding.result.confidence_available
+                else evidence_out.confidence
+            )
+            result = AnalysisResult(
+                status=AnalysisStatus.COMPLETED,
+                session_id=session_id,
+                answer=answer,
+                confidence=confidence,
+                confidence_available=understanding.result.confidence_available or bool(regions),
+                metrics=evidence_out.metrics,
+                evidence=evidence_out.regions,
+                trace=trace,
+                mode=DataMode.DEVELOPMENT,
+                bi_temporal_change=understanding.result,
+            )
+            self._store.complete(session_id, result)
+            return result
+        except SatQueryError:
+            raise
+        except Exception as exc:
+            self._fail_trace(trace, exc)
+            raise SatQueryError("analysis_failed", str(exc), status_code=500) from exc
+
+    async def _submit_single_image(self, request: QueryRequest) -> AnalysisResult:
+        session_id = self._store.create()
+        trace: list[TraceStep] = []
+        image_id = request.image_id
+        if not image_id:
+            raise SatQueryError(
+                "invalid_request",
+                "image_id is required for single-image VQA or scene caption.",
+                status_code=400,
+            )
+
+        try:
+            provider = get_uploaded_imagery_provider()
+            if not provider.exists(image_id):
+                raise SatQueryError("image_not_found", f"Unknown image_id: {image_id}", status_code=404)
+            image = provider.get(image_id)
+
+            validation = await self._run_input_validation_step(trace, image)
+            if not validation.valid:
+                self._store.update_trace(session_id, trace)
+                raise SatQueryError(
+                    "input_validation_failed",
+                    "; ".join(validation.errors) or "Input validation failed.",
+                    status_code=400,
+                )
+
+            plan_output = await self._run_plan_step(trace, request, image_modality=image.modality)
+            plan = plan_output.plan
+            if plan.user_intent == QueryIntent.SINGLE_IMAGE_CAPTION:
+                caption_out = await self._run_geochat_caption_step(trace, request, image, plan)
+                await self._run_caption_generate_evidence_step(trace, caption_out.result)
+
+                answer = self._answer.compose_caption(request, caption_out.result)
+                metrics = build_caption_metrics(caption_out.result)
+                mode = (
+                    DataMode.EARTH_ENGINE
+                    if caption_out.result.provider.value == "geochat_service"
+                    else DataMode.DEVELOPMENT
+                )
+                confidence = (
+                    caption_out.result.confidence if caption_out.result.confidence_available else 0.0
+                )
+                result = AnalysisResult(
+                    status=AnalysisStatus.COMPLETED,
+                    session_id=session_id,
+                    answer=answer,
+                    confidence=confidence,
+                    confidence_available=caption_out.result.confidence_available,
+                    metrics=metrics,
+                    evidence=[],
+                    trace=trace,
+                    mode=mode,
+                    caption=caption_out.result,
+                )
+                self._store.complete(session_id, result)
+                return result
+
+            if plan.user_intent != QueryIntent.SINGLE_IMAGE_VQA:
+                raise SatQueryError(
+                    "planner_routing_error",
+                    f"Expected single_image_vqa or single_image_caption intent, got {plan.user_intent.value}.",
+                    status_code=500,
+                )
+
+            vqa_out = await self._run_geochat_vqa_step(trace, request, image, plan)
+            await self._run_vqa_generate_evidence_step(trace, vqa_out.result)
+
+            answer = self._answer.compose_vqa(request, vqa_out.result)
+            metrics = build_vqa_metrics(vqa_out.result)
+            mode = (
+                DataMode.EARTH_ENGINE
+                if vqa_out.result.provider.value == "geochat_service"
+                else DataMode.DEVELOPMENT
+            )
+            confidence = vqa_out.result.confidence if vqa_out.result.confidence_available else 0.0
+            result = AnalysisResult(
+                status=AnalysisStatus.COMPLETED,
+                session_id=session_id,
+                answer=answer,
+                confidence=confidence,
+                confidence_available=vqa_out.result.confidence_available,
+                metrics=metrics,
+                evidence=[],
+                trace=trace,
+                mode=mode,
+                vqa=vqa_out.result,
+            )
+            self._store.complete(session_id, result)
+            return result
+        except SatQueryError:
+            raise
+        except Exception as exc:
+            self._fail_trace(trace, exc)
+            raise SatQueryError("analysis_failed", str(exc), status_code=500) from exc
+
+    async def _submit_temporal_analysis(self, request: QueryRequest) -> AnalysisResult:
         session_id = self._store.create()
         trace: list[TraceStep] = []
         plan_output = await self._run_plan_step(trace, request)
@@ -132,7 +476,13 @@ class QueryController:
             raise SatQueryError("session_not_found", f"No result for session: {session_id}", status_code=404)
         return session.result
 
-    async def _run_plan_step(self, trace: list[TraceStep], request: QueryRequest):
+    async def _run_plan_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        *,
+        image_modality: ImageModality | None = None,
+    ):
         step_id = f"plan_query-{len(trace) + 1}"
         started = datetime.now(UTC)
         t0 = perf_counter()
@@ -147,7 +497,7 @@ class QueryController:
         await asyncio.sleep(0)
 
         try:
-            plan_output = await plan_query(request)
+            plan_output = await plan_query(request, image_modality=image_modality)
             elapsed = int((perf_counter() - t0) * 1000)
             plan = plan_output.plan
             step.status = TraceStatus.COMPLETED
@@ -174,6 +524,672 @@ class QueryController:
             step.error = str(exc)
             step.summary = "plan_query failed"
             raise
+
+    async def _run_input_validation_step(
+        self,
+        trace: list[TraceStep],
+        image: ImageInput,
+    ) -> InputValidationResult:
+        step_id = f"input_validation-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="input_validation",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Validating uploaded image input…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        validation = validate_single_image(image)
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        if validation.valid:
+            step.status = TraceStatus.COMPLETED
+            step.summary = "Input validation passed."
+        else:
+            step.status = TraceStatus.FAILED
+            step.summary = "Input validation failed."
+            step.error = "; ".join(validation.errors)
+        step.metadata = {
+            "task": "single_image",
+            "image_id": image.id,
+            "modality": image.modality.value,
+            "format": image.format.value,
+            "valid": validation.valid,
+            "errors": validation.errors,
+            "warnings": validation.warnings,
+            "checks": [c.model_dump() for c in validation.checks],
+            "status": step.status.value,
+            "duration_ms": elapsed,
+        }
+        return validation
+
+    async def _run_bi_temporal_validation_step(
+        self,
+        trace: list[TraceStep],
+        earlier: ImageInput,
+        later: ImageInput,
+    ) -> InputValidationResult:
+        step_id = f"input_validation-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="input_validation",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Validating uploaded bi-temporal image pair…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        validation = validate_bi_temporal(earlier, later, require_acquisition_dates=True)
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        if validation.valid:
+            step.status = TraceStatus.COMPLETED
+            step.summary = "Bi-temporal input validation passed."
+        else:
+            step.status = TraceStatus.FAILED
+            step.summary = "Bi-temporal input validation failed."
+            step.error = "; ".join(validation.errors)
+        step.metadata = {
+            "task": "bi_temporal_change_vqa",
+            "earlier_image_id": earlier.id,
+            "later_image_id": later.id,
+            "valid": validation.valid,
+            "errors": validation.errors,
+            "warnings": validation.warnings,
+            "checks": [c.model_dump() for c in validation.checks],
+            "status": step.status.value,
+            "duration_ms": elapsed,
+        }
+        return validation
+
+    async def _run_uploaded_detect_change_step(
+        self,
+        trace: list[TraceStep],
+        earlier: ImageInput,
+        later: ImageInput,
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"detect_change-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="detect_change",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Running change detection on uploaded bi-temporal pair…",
+            metadata={
+                "task": plan.user_intent.value,
+                "detector": "deterministic_change_detector",
+                "earlier_image_id": earlier.id,
+                "later_image_id": later.id,
+            },
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            payload = build_change_detection_input(earlier, later)
+            output = await self._upload_detect.execute(payload)
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = (
+                f"Detected {output.raw_detection_count} change region(s) via {output.detector}"
+            )
+            step.metadata = {
+                **(step.metadata or {}),
+                "provider": "uploaded_cva",
+                "detector": output.detector,
+                "raw_detection_count": output.raw_detection_count,
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+            }
+            return output
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "detect_change failed"
+            raise
+
+    async def _run_change_understanding_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        earlier: ImageInput,
+        later: ImageInput,
+        detections,
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"change_understanding-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="change_understanding",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Interpreting change evidence for the user question…",
+            metadata={
+                "task": plan.user_intent.value,
+                "question": request.query,
+                "detector": detections.detector,
+            },
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            output = await self._change_understanding.execute(
+                ChangeUnderstandingToolInput(
+                    query=request.query,
+                    earlier=earlier,
+                    later=later,
+                    detections=detections,
+                )
+            )
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = (
+                f"Change understanding completed ({output.result.changed_region_count} regions)"
+            )
+            step.metadata = {
+                **(step.metadata or {}),
+                "provider": output.result.provider.value,
+                "detector": output.result.detector,
+                "changed_region_count": output.result.changed_region_count,
+                "change_map_available": output.result.change_map_available,
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+            }
+            return output
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "change_understanding failed"
+            raise
+
+    async def _run_bi_temporal_generate_evidence_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        detections,
+        regions,
+        *,
+        earlier: ImageInput,
+        later: ImageInput,
+    ):
+        step_id = f"generate_evidence-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="generate_evidence",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Packaging bi-temporal change evidence…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        from app.adapters.imagery.uploaded.bi_temporal_bridge import build_imagery_result_from_pair
+
+        imagery = build_imagery_result_from_pair(earlier, later)
+        evidence_out = await self._evidence_tool.execute(
+            GenerateEvidenceInput(
+                query=request.query,
+                imagery=imagery,
+                fused_regions=regions,
+                fusion_metadata={"source": "uploaded_bi_temporal_cva"},
+            )
+        )
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.status = TraceStatus.COMPLETED
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        step.summary = f"Validated {len(evidence_out.regions)} change evidence region(s)."
+        step.metadata = {
+            "task": "bi_temporal_change_vqa",
+            "evidence_regions": len(evidence_out.regions),
+            "detector": detections.detector,
+            "status": TraceStatus.COMPLETED.value,
+            "duration_ms": elapsed,
+        }
+        return evidence_out
+
+    async def _run_cross_modal_validation_step(
+        self,
+        trace: list[TraceStep],
+        optical: ImageInput,
+        sar: ImageInput,
+    ) -> InputValidationResult:
+        step_id = f"input_validation-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="input_validation",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Validating uploaded optical+SAR cross-modal pair…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        validation = validate_optical_sar_pair(optical, sar)
+        coreg_status, coreg_msg = resolve_co_registration_status(optical, sar)
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        if validation.valid:
+            step.status = TraceStatus.COMPLETED
+            step.summary = "Cross-modal input validation passed."
+        else:
+            step.status = TraceStatus.FAILED
+            step.summary = "Cross-modal input validation failed."
+            step.error = "; ".join(validation.errors)
+        step.metadata = {
+            "task": "cross_modal_optical_sar",
+            "optical_image_id": optical.id,
+            "sar_image_id": sar.id,
+            "valid": validation.valid,
+            "errors": validation.errors,
+            "warnings": validation.warnings,
+            "co_registration_status": coreg_status.value,
+            "co_registration_provenance": coreg_msg,
+            "checks": [c.model_dump() for c in validation.checks],
+            "status": step.status.value,
+            "duration_ms": elapsed,
+        }
+        return validation
+
+    async def _run_optical_analysis_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        optical: ImageInput,
+        bounds: list[float],
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"optical_analysis-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="optical_analysis",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Running optical/multispectral specialist…",
+            metadata={"task": plan.user_intent.value, "optical_image_id": optical.id},
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            summary = await self._optical_analysis.execute(
+                OpticalAnalysisInput(
+                    query=request.query,
+                    optical_image_id=optical.id,
+                    bounds=bounds,
+                )
+            )
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = f"Optical analysis completed ({len(summary.regions)} region cues)"
+            step.metadata = {
+                **(step.metadata or {}),
+                "analyzer": summary.analyzer,
+                "provider": summary.provider.value,
+                "region_count": len(summary.regions),
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+            }
+            return summary
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "optical_analysis failed"
+            raise
+
+    async def _run_sar_analysis_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        sar: ImageInput,
+        bounds: list[float],
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"sar_analysis-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="sar_analysis",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Running SAR specialist…",
+            metadata={"task": plan.user_intent.value, "sar_image_id": sar.id},
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            summary = await self._sar_analysis.execute(
+                SARAnalysisInput(
+                    query=request.query,
+                    sar_image_id=sar.id,
+                    bounds=bounds,
+                )
+            )
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = f"SAR analysis completed ({len(summary.regions)} region cues)"
+            step.metadata = {
+                **(step.metadata or {}),
+                "analyzer": summary.analyzer,
+                "provider": summary.provider.value,
+                "region_count": len(summary.regions),
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+            }
+            return summary
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "sar_analysis failed"
+            raise
+
+    async def _run_cross_modal_fusion_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        optical: ImageInput,
+        sar: ImageInput,
+        optical_summary,
+        sar_summary,
+        bounds: list[float],
+        co_registration_status,
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"cross_modal_fusion-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="cross_modal_fusion",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Fusing optical and SAR analyses…",
+            metadata={
+                "task": plan.user_intent.value,
+                "optical_image_id": optical.id,
+                "sar_image_id": sar.id,
+                "co_registration_status": co_registration_status.value,
+            },
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            fused_summary, fused_regions = await self._cross_modal_fusion.execute(
+                CrossModalFusionInput(
+                    query=request.query,
+                    optical=optical_summary,
+                    sar=sar_summary,
+                    optical_image_id=optical.id,
+                    sar_image_id=sar.id,
+                    bounds=bounds,
+                    co_registration_status=co_registration_status,
+                )
+            )
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = (
+                f"Cross-modal fusion produced {fused_summary.fused_region_count} joint region(s)"
+            )
+            step.metadata = {
+                **(step.metadata or {}),
+                "fusion_policy": fused_summary.fusion_policy,
+                "fused_region_count": fused_summary.fused_region_count,
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+            }
+            return fused_summary, fused_regions
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "cross_modal_fusion failed"
+            raise
+
+    async def _run_cross_modal_generate_evidence_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        optical: ImageInput,
+        sar: ImageInput,
+        fused_regions,
+    ):
+        step_id = f"generate_evidence-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="generate_evidence",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Packaging cross-modal fused evidence…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        imagery = build_cross_modal_imagery_result(optical, sar)
+        evidence_out = await self._evidence_tool.execute(
+            GenerateEvidenceInput(
+                query=request.query,
+                imagery=imagery,
+                fused_regions=fused_regions,
+                fusion_metadata={"source": "uploaded_cross_modal_fusion"},
+            )
+        )
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.status = TraceStatus.COMPLETED
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        step.summary = f"Validated {len(evidence_out.regions)} fused evidence region(s)."
+        step.metadata = {
+            "task": "cross_modal_optical_sar",
+            "evidence_regions": len(evidence_out.regions),
+            "status": TraceStatus.COMPLETED.value,
+            "duration_ms": elapsed,
+        }
+        return evidence_out
+
+    async def _run_geochat_vqa_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        image: ImageInput,
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"geochat_vqa-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        parameters = GeoChatVQAParameters()
+        step = TraceStep(
+            id=step_id,
+            tool_name="geochat_vqa",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Running GeoChat single-image VQA…",
+            metadata={
+                "task": plan.user_intent.value,
+                "model": "MBZUAI/geochat-7B",
+                "requested_modality": plan.requested_modalities[0].value,
+                "parameters": parameters.model_dump(),
+            },
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            output = await self._geochat_vqa.execute(
+                GeoChatVQAInput(image=image, question=request.query, parameters=parameters)
+            )
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = (
+                f"GeoChat VQA completed via {output.result.provider.value} "
+                f"({output.result.model_name})"
+            )
+            step.metadata = {
+                **(step.metadata or {}),
+                "provider": output.result.provider.value,
+                "model_name": output.result.model_name,
+                "model_version": output.result.model_version,
+                "provenance": output.result.provenance,
+                "confidence_available": output.result.confidence_available,
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+                "fallback_used": False,
+            }
+            return output
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "geochat_vqa failed"
+            raise
+
+    async def _run_geochat_caption_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+        image: ImageInput,
+        plan: QueryAnalysisPlan,
+    ):
+        step_id = f"geochat_caption-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        parameters = GeoChatCaptionParameters()
+        step = TraceStep(
+            id=step_id,
+            tool_name="geochat_caption",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Running GeoChat single-image scene description…",
+            metadata={
+                "task": plan.user_intent.value,
+                "model": "MBZUAI/geochat-7B",
+                "requested_modality": plan.requested_modalities[0].value,
+                "parameters": parameters.model_dump(),
+            },
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        try:
+            output = await self._geochat_caption.execute(
+                GeoChatCaptionInput(
+                    image=image,
+                    user_request=request.query,
+                    parameters=parameters,
+                )
+            )
+            elapsed = int((perf_counter() - t0) * 1000)
+            step.status = TraceStatus.COMPLETED
+            step.completed_at = datetime.now(UTC)
+            step.duration_ms = elapsed
+            step.summary = (
+                f"GeoChat scene caption completed via {output.result.provider.value} "
+                f"({output.result.model_name})"
+            )
+            step.metadata = {
+                **(step.metadata or {}),
+                "provider": output.result.provider.value,
+                "model_name": output.result.model_name,
+                "model_version": output.result.model_version,
+                "provenance": output.result.provenance,
+                "confidence_available": output.result.confidence_available,
+                "status": TraceStatus.COMPLETED.value,
+                "duration_ms": elapsed,
+                "fallback_used": False,
+            }
+            return output
+        except Exception as exc:
+            step.status = TraceStatus.FAILED
+            step.completed_at = datetime.now(UTC)
+            step.error = str(exc)
+            step.summary = "geochat_caption failed"
+            raise
+
+    async def _run_caption_generate_evidence_step(self, trace: list[TraceStep], caption_result) -> None:
+        step_id = f"generate_evidence-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="generate_evidence",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Packaging scene-description provenance…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.status = TraceStatus.COMPLETED
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        step.summary = "Scene description and provenance recorded (no spatial evidence regions)."
+        step.metadata = {
+            "task": "single_image_caption",
+            "evidence_regions": 0,
+            "model_name": caption_result.model_name,
+            "provider": caption_result.provider.value,
+            "provenance": caption_result.provenance,
+            "status": TraceStatus.COMPLETED.value,
+            "duration_ms": elapsed,
+        }
+
+    async def _run_vqa_generate_evidence_step(self, trace: list[TraceStep], vqa_result) -> None:
+        step_id = f"generate_evidence-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="generate_evidence",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Packaging VQA provenance and answer…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.status = TraceStatus.COMPLETED
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        step.summary = "VQA answer and provenance recorded (no spatial evidence regions)."
+        step.metadata = {
+            "task": "single_image_vqa",
+            "evidence_regions": 0,
+            "model_name": vqa_result.model_name,
+            "provider": vqa_result.provider.value,
+            "provenance": vqa_result.provenance,
+            "status": TraceStatus.COMPLETED.value,
+            "duration_ms": elapsed,
+        }
 
     async def _run_semantics_step(
         self,
@@ -262,6 +1278,12 @@ class QueryController:
             return f"Fused {len(output.regions)} evidence region(s) ({output.fusion_metadata.get('fusion_policy')})"
         if tool_name == "generate_evidence":
             return f"Validated {len(output.regions)} evidence region(s)"
+        if tool_name == "geochat_vqa":
+            return f"GeoChat VQA via {output.result.provider.value}"
+        if tool_name == "geochat_caption":
+            return f"GeoChat scene caption via {output.result.provider.value}"
+        if tool_name == "change_understanding":
+            return f"Change understanding via {output.result.detector}"
         return f"{tool_name} completed"
 
     async def _fetch_imagery(self, request: QueryRequest, plan: QueryAnalysisPlan):

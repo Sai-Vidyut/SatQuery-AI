@@ -38,7 +38,10 @@ Open http://localhost:3000. API requests proxy through Next.js to the backend (`
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Service health and imagery provider mode |
-| POST | `/api/v1/imagery/fetch` | Fetch imagery metadata |
+| POST | `/api/v1/imagery/fetch` | Fetch catalog imagery metadata (Earth Engine / development) |
+| POST | `/api/v1/imagery/upload` | Upload and validate user-provided GeoTIFF/TIFF (PNG/JPEG for benchmark datasets) |
+| GET | `/api/v1/imagery/{image_id}` | Retrieve normalized upload metadata |
+| POST | `/api/v1/imagery/validate-input` | Validate single / bi-temporal / optical+SAR input compatibility |
 | POST | `/api/v1/query/submit` | Run full analysis pipeline |
 | GET | `/api/v1/query/{session_id}/trace` | Execution trace |
 | GET | `/api/v1/query/{session_id}/result` | Stored analysis result |
@@ -49,6 +52,37 @@ Open http://localhost:3000. API requests proxy through Next.js to the backend (`
 Default: `IMAGERY_PROVIDER=development`. Responses include `mode: "development"` and an explicit disclaimer message.
 
 For real Sentinel-2 imagery via Google Earth Engine, set `IMAGERY_PROVIDER=earth_engine` (see below).
+
+## Input paths (Phase 8)
+
+Upload + validate user imagery (`POST /api/v1/imagery/upload`). See `backend/app/schemas/input.py`.
+
+## Single-image VQA (Phase 10 — SIH mandatory)
+
+- Upload one GeoTIFF/TIFF (or benchmark PNG/JPEG) → ask a natural-language question → GeoChat-7B specialist
+- Workstation **Upload image** mode or `POST /api/v1/query/submit` with `{ query, image_id }`
+- Real inference: `GEOCHAT_VQA_PROVIDER=geochat_service` + GPU service (Phase 9B reference). Local dev uses labeled `development` mock.
+- Acceptance procedure: `docs/SIH_ACCEPTANCE_SINGLE_IMAGE_VQA.md`
+
+## Single-image scene description (Phase 11 — SIH mandatory)
+
+- Same upload path; planner routes scene-description queries to `single_image_caption` → `geochat_caption`
+- Example query: `Describe this satellite scene.`
+- Structured result in `AnalysisResult.caption` (distinct from VQA `answer`)
+- Acceptance procedure: `docs/SIH_ACCEPTANCE_SINGLE_IMAGE_SCENE_DESCRIPTION.md`
+
+## Bi-temporal change analysis (Phase 12 — SIH mandatory)
+
+- Upload two GeoTIFF/TIFF images with `acquisition_datetime` → ask a change question
+- Workstation **Temporal pair** mode or `POST /api/v1/query/submit` with `{ query, earlier_image_id, later_image_id }`
+- Reuses existing deterministic CVA on uploaded pair overlap (development path)
+- Acceptance procedure: `docs/SIH_ACCEPTANCE_BI_TEMPORAL_CHANGE.md`
+
+**Earth Engine path (unchanged):** AOI + dates → catalog provider → CVA / Dynamic World / SAR / fusion.
+
+**Upload path:** user file → local storage → `ImageInput` validation → VQA or scene caption via GeoChat RS-VLM adapter. Grounding and change-VQA are **not** implemented yet.
+
+Upload config: `UPLOAD_DIR` (default `data/uploads`), `MAX_UPLOAD_SIZE_MB` (default `256`).
 
 ## Google Earth Engine setup (Phase 2A)
 

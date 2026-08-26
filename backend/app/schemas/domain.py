@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.schemas.vqa import SingleImageCaptionResult, SingleImageVQAResult
+from app.schemas.bi_temporal_change import BiTemporalChangeResult
 
 class SensorType(str, Enum):
     SENTINEL_2 = "sentinel-2"
@@ -119,14 +121,80 @@ class ImageryResult(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str = Field(min_length=3, max_length=2000)
-    aoi: AOI
-    earlier_date: date
-    later_date: date
+    aoi: AOI | None = None
+    earlier_date: date | None = None
+    later_date: date | None = None
     sensor: SensorType = SensorType.SENTINEL_2
     preferences: ImageryPreferences = Field(default_factory=ImageryPreferences)
+    image_id: str | None = Field(
+        default=None,
+        description="Uploaded image id for single-image VQA or scene-caption mode.",
+    )
+    earlier_image_id: str | None = Field(
+        default=None,
+        description="Earlier image id for uploaded bi-temporal change analysis.",
+    )
+    later_image_id: str | None = Field(
+        default=None,
+        description="Later image id for uploaded bi-temporal change analysis.",
+    )
+    optical_image_id: str | None = Field(
+        default=None,
+        description="Optical/multispectral image id for cross-modal analysis.",
+    )
+    sar_image_id: str | None = Field(
+        default=None,
+        description="SAR image id for cross-modal analysis.",
+    )
+
+    @property
+    def is_cross_modal_upload(self) -> bool:
+        return self.optical_image_id is not None and self.sar_image_id is not None
+
+    @property
+    def is_bi_temporal_upload(self) -> bool:
+        return (
+            self.earlier_image_id is not None
+            and self.later_image_id is not None
+            and not self.is_cross_modal_upload
+        )
+
+    @property
+    def is_single_image_vqa(self) -> bool:
+        return (
+            self.image_id is not None
+            and not self.is_bi_temporal_upload
+            and not self.is_cross_modal_upload
+        )
 
     @model_validator(mode="after")
     def validate_query_dates(self) -> QueryRequest:
+        if self.is_cross_modal_upload:
+            if self.image_id or self.earlier_image_id or self.later_image_id:
+                raise ValueError(
+                    "cross-modal mode requires only optical_image_id and sar_image_id"
+                )
+            if self.aoi is not None or self.earlier_date is not None or self.later_date is not None:
+                raise ValueError("aoi and catalog dates are not used for cross-modal upload analysis")
+            return self
+        if self.is_bi_temporal_upload:
+            if self.image_id is not None:
+                raise ValueError("image_id cannot be combined with earlier_image_id/later_image_id")
+            if self.aoi is not None or self.earlier_date is not None or self.later_date is not None:
+                raise ValueError(
+                    "aoi and catalog dates are not used for uploaded bi-temporal change analysis"
+                )
+            return self
+        if self.is_single_image_vqa:
+            if self.earlier_image_id or self.later_image_id or self.optical_image_id or self.sar_image_id:
+                raise ValueError("single-image mode requires image_id only")
+            return self
+        if self.earlier_image_id or self.later_image_id:
+            raise ValueError("earlier_image_id and later_image_id must be provided together")
+        if self.optical_image_id or self.sar_image_id:
+            raise ValueError("optical_image_id and sar_image_id must be provided together")
+        if self.aoi is None or self.earlier_date is None or self.later_date is None:
+            raise ValueError("aoi, earlier_date, and later_date are required for catalog queries")
         if self.later_date <= self.earlier_date:
             raise ValueError("later_date must be after earlier_date")
         return self
@@ -166,10 +234,15 @@ class AnalysisResult(BaseModel):
     session_id: str
     answer: str
     confidence: float = Field(ge=0, le=1)
+    confidence_available: bool = True
     metrics: list[Metric] = Field(default_factory=list)
     evidence: list[EvidenceRegion] = Field(default_factory=list)
     trace: list[TraceStep] = Field(default_factory=list)
     mode: DataMode = DataMode.DEVELOPMENT
+    vqa: SingleImageVQAResult | None = None
+    caption: SingleImageCaptionResult | None = None
+    bi_temporal_change: BiTemporalChangeResult | None = None
+    cross_modal: "CrossModalOpticalSARResult | None" = None
 
 
 class ChangeDetectionInput(BaseModel):
@@ -254,3 +327,8 @@ class SemanticAnalysisOutput(BaseModel):
     analyzer: str
     mode: DataMode
     analyzer_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+from app.schemas.cross_modal import CrossModalOpticalSARResult  # noqa: E402
+
+AnalysisResult.model_rebuild()

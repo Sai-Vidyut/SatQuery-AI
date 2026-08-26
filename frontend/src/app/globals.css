@@ -38,7 +38,7 @@
 
   --sq-focus: 0 0 0 2px var(--sq-void), 0 0 0 4px var(--sq-amber);
 
-  --sq-composer-offset: 76px;
+  --sq-composer-offset: 120px;
   --sq-inspector-width: 380px;
 }
 
@@ -445,6 +445,23 @@ body {
 .composer-shell {
   border-radius: var(--sq-radius-lg);
   padding: 8px 12px;
+}
+
+.composer-mode-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.composer-upload-status {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--sq-text-muted);
+}
+
+.btn-secondary--active {
+  border-color: var(--sq-accent);
+  color: var(--sq-accent);
 }
 
 .composer-row {

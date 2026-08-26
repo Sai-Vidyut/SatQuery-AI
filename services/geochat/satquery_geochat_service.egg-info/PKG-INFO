@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: satquery-geochat-service
+Version: 0.1.0
+Summary: Standalone GeoChat-7B GPU inference service for SatQuery AI
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn[standard]>=0.32.0
+Requires-Dist: pydantic>=2.10.0
+Requires-Dist: httpx>=0.28.0
+Requires-Dist: pillow>=10.0.0
+Requires-Dist: numpy>=1.26.0
+Requires-Dist: tifffile>=2024.8.0
+Provides-Extra: gpu
+Requires-Dist: torch>=2.1.0; extra == "gpu"
+Requires-Dist: transformers==4.36.2; extra == "gpu"
+Requires-Dist: accelerate==0.25.0; extra == "gpu"
+Requires-Dist: bitsandbytes>=0.41.0; extra == "gpu"
+Requires-Dist: sentencepiece==0.1.99; extra == "gpu"
+Requires-Dist: einops==0.6.1; extra == "gpu"
+Requires-Dist: einops-exts==0.0.4; extra == "gpu"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24.0; extra == "dev"

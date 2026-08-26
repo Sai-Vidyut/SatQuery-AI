@@ -1,0 +1,62 @@
+# BigEarthNet.txt dataset acquisition + subset strategy.
+#
+# VERIFIED facts (checked directly against the HF dataset repo in Phase 9A/9B,
+# via the HF API and the datasets-server rows API — no assumptions):
+
+source:
+  hf_repo: "BIFOLD-BigEarthNetv2-0/BigEarthNet.txt"
+  hf_repo_type: "dataset"
+  license: "cdla-permissive-1.0"
+  paper: "arXiv:2603.29630 (Herzog et al., 2026)"
+  contents: >
+    ONE parquet file (BigEarthNet.txt.parquet, ~1.4GB) containing TEXT ONLY:
+    464,044 co-registered Sentinel-1/Sentinel-2 patch-ID pairs, ~9.6M
+    question/answer/caption annotations referencing those patch IDs. There
+    is NO pixel data in this repository. Columns (VERIFIED via
+    datasets-server): ID, s1_name, patch_id, input, output, type, category,
+    split, latitude, longitude, country, season, climate_zone.
+  image_data_location: >
+    The `s1_name` / `patch_id` columns are BigEarthNet v2.0 patch names.
+    Actual pixel data (Sentinel-1 GRD + Sentinel-2 L2A GeoTIFFs) must be
+    downloaded SEPARATELY from https://bigearth.net (official archive,
+    ~118GB total for S1+S2+reference maps per the Zenodo record
+    10.5281/zenodo.10891137), then converted to an LMDB via the `rico-hdl`
+    tool referenced in the dataset's own README. There is no official
+    small-sample / partial-download mechanism for the raw archive.
+  optical_sar_relevance: >
+    YES — BigEarthNet.txt is explicitly multi-sensor: every text example
+    references BOTH an s1_name (Sentinel-1 SAR) and a patch_id
+    (Sentinel-2 optical) for the same geographic patch. This makes it
+    directly relevant to SatQuery's existing optical+SAR fusion capability
+    (bi-temporal/optical_sar_pair input types in schemas/input.py), even
+    though the GeoChat VLM itself is being adapted for OPTICAL VQA/
+    captioning only in this phase (SAR interpretation remains the
+    existing EarthEngineSARChangeDetector's job, not the VLM's).
+
+acquisition_strategy_for_poc:
+  approach: "small_metadata_sample_via_datasets_server_api"
+  rationale: >
+    Downloading the full 1.4GB metadata parquet is unnecessary for a
+    proof-of-concept conversion-pipeline test. The HF `datasets-server`
+    REST API (https://datasets-server.huggingface.co/rows) returns
+    individual rows as JSON without downloading the parquet file at all.
+    This experiment uses that API to pull a small, deterministic sample
+    (see scripts/prepare_bigearthnet_subset.py), consistent with the
+    task's instruction to avoid unnecessary large downloads.
+  sample_size: 200
+  sample_selection: "first N rows of a fixed, documented filter (see script), deterministic and reproducible — no random sampling"
+  raw_imagery_status: >
+    NOT obtained in Phase 9B. The 118GB raw archive is out of scope for a
+    controlled proof-of-concept per the task's explicit instruction. The
+    metadata subset is prepared and the conversion-to-GeoChat-format logic
+    is built and unit-tested against it, but end-to-end training requires
+    the corresponding patch imagery, which is a Phase 9C decision (see
+    README "Known limitations").
+
+smoke_test_image_policy: >
+  For the ONE cloud inference smoke test, this experiment uses a REAL
+  Sentinel-2 scene fetched live via the existing authenticated Earth Engine
+  workflow (same approach as Phase 9A's fetch_image.py), NOT a BigEarthNet
+  patch. This is explicitly labeled "REAL SENTINEL-2 SMOKE TEST" everywhere
+  in code/docs/output and must never be described as "BigEarthNet
+  adaptation" — see scripts/fetch_sentinel2_sample.py.

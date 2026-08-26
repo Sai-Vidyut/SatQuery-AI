@@ -12,6 +12,7 @@ backend/**/__pycache__/
 backend/**/*.pyc
 backend/.pytest_cache/
 backend/.mypy_cache/
+backend/data/uploads/
 
 # Node (frontend)
 frontend/node_modules/
@@ -19,3 +20,35 @@ frontend/.next/
 frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
+
+# Phase 9A GeoChat smoke test (temporary, experiments/ only — not app code)
+experiments/phase9a_geochat_smoketest/.venv/
+experiments/phase9a_geochat_smoketest/GeoChat_src/
+experiments/phase9a_geochat_smoketest/*.png
+experiments/phase9a_geochat_smoketest/*.json
+experiments/phase9a_geochat_smoketest/*.txt
+
+# Phase 9B GeoChat cloud adaptation experiment (experiments/ only — not app code)
+experiments/phase9b_geochat_adaptation/.venv/
+experiments/phase9b_geochat_adaptation/GeoChat_src/
+experiments/phase9b_geochat_adaptation/data/
+experiments/phase9b_geochat_adaptation/outputs/
+experiments/phase9b_geochat_adaptation/**/__pycache__/
+experiments/phase9b_geochat_adaptation/**/*.egg-info/
+experiments/phase9b_geochat_adaptation/**/.pytest_cache/
+
+# Phase 9B Colab smoke test (generated notebook + runtime outputs)
+experiments/phase9b_geochat/__pycache__/
+experiments/phase9b_geochat/colab_geochat_smoke_test.ipynb
+experiments/phase9b_geochat/smoke_test_result.json
+experiments/phase9b_geochat/assets/sentinel2_smoketest.b64
+experiments/phase9b_geochat/colab_paste_block.py
+
+# Phase 14 GeoChat inference service (no weights committed)
+services/geochat/validation_artifacts/
+services/geochat/.venv/
+services/geochat/**/__pycache__/
+services/geochat/**/.pytest_cache/
+# No model weights, dataset files, or checkpoints are ever committed.
+*.ckpt
+*.safetensors

@@ -1,0 +1,10 @@
+# Phase 9B Colab smoke test — generated / runtime artifacts
+colab_geochat_smoke_test.ipynb
+smoke_test_result.json
+assets/sentinel2_smoketest.b64
+colab_paste_block.py
+
+# Keep tracked in git:
+# assets/sentinel2_smoketest.png
+# assets/sentinel2_smoketest.metadata.json
+# notebook_cells/*.py

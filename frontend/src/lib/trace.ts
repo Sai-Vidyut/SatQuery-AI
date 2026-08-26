@@ -7,6 +7,13 @@ const TOOL_LABELS: Record<string, string> = {
   analyze_semantics: "Analyze semantics",
   detect_sar_change: "Detect SAR change",
   fuse_evidence: "Fuse evidence",
+  input_validation: "Validate input",
+  geochat_vqa: "GeoChat VQA",
+  geochat_caption: "GeoChat scene caption",
+  change_understanding: "Change understanding",
+  optical_analysis: "Optical analysis",
+  sar_analysis: "SAR analysis",
+  cross_modal_fusion: "Cross-modal fusion",
   generate_evidence: "Generate evidence",
 };
 

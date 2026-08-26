@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from app.schemas.bi_temporal_change import BiTemporalChangeResult
+from app.schemas.cross_modal import CrossModalOpticalSARResult
 from app.schemas.domain import DataMode, GenerateEvidenceOutput, QueryRequest, SensorType
+from app.schemas.vqa import SingleImageCaptionResult, SingleImageVQAResult, VQAProviderKind
 from app.services.query_profiles import BUILDING_CONSTRUCTION_PROFILE
 
 
@@ -107,3 +110,37 @@ class AnswerEngine:
             f"\"{request.query.strip()}\" between {request.earlier_date.isoformat()} and "
             f"{request.later_date.isoformat()}. Mean confidence {pct}%.{mode_note}"
         )
+
+    def compose_vqa(self, request: QueryRequest, vqa: SingleImageVQAResult) -> str:
+        """Return the model narrative without inventing spatial evidence."""
+        provider_note = ""
+        if vqa.provider == VQAProviderKind.DEVELOPMENT:
+            provider_note = " [development mock provider — not real GeoChat inference]"
+        elif vqa.model_name == "MBZUAI/geochat-7B":
+            provider_note = f" [model: {vqa.model_name}]"
+        else:
+            provider_note = f" [model: {vqa.model_name}, provider: {vqa.provider.value}]"
+        return f"{vqa.answer.strip()}{provider_note}"
+
+    def compose_caption(self, request: QueryRequest, caption: SingleImageCaptionResult) -> str:
+        """Return the scene description without inventing spatial evidence."""
+        provider_note = ""
+        if caption.provider == VQAProviderKind.DEVELOPMENT:
+            provider_note = " [development mock provider — not real GeoChat inference]"
+        elif caption.model_name == "MBZUAI/geochat-7B":
+            provider_note = f" [model: {caption.model_name}]"
+        else:
+            provider_note = f" [model: {caption.model_name}, provider: {caption.provider.value}]"
+        return f"{caption.description.strip()}{provider_note}"
+
+    def compose_bi_temporal_change(
+        self,
+        request: QueryRequest,
+        change: BiTemporalChangeResult,
+    ) -> str:
+        mode_note = " [development uploaded CVA — not Earth Engine catalog]"
+        return f"{change.change_summary.strip()}{mode_note}"
+
+    def compose_cross_modal(self, request: QueryRequest, result: CrossModalOpticalSARResult) -> str:
+        mode_note = " [development cross-modal pipeline — not Earth Engine catalog fusion]"
+        return f"{result.fused_analysis.summary.strip()}{mode_note}"

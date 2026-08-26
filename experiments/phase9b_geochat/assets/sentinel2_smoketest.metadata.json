@@ -1,0 +1,19 @@
+{
+  "source": "COPERNICUS/S2_SR_HARMONIZED (Google Earth Engine)",
+  "scene_id": "S2A_MSIL2A_20230815T095031_N0509_R079_T33UXP_20230815T155057",
+  "acquisition_time_iso": "2023-08-15T09:57:24.627000+00:00",
+  "bands": ["B4 (Red)", "B3 (Green)", "B2 (Blue)"],
+  "scaling": "surface reflectance DN, stretched [0, 3000] -> [0, 255]",
+  "aoi_wgs84": [
+    16.546090477803443,
+    48.164067553000365,
+    16.65390952219656,
+    48.23593244699964
+  ],
+  "output_dimensions_px": 504,
+  "label": "REAL_SENTINEL2_SMOKETEST",
+  "provenance": "Fetched via Phase 9A/9B fetch_sentinel2_sample.py workflow (Vienna mixed urban/agricultural AOI). Not invented.",
+  "png_bytes": 661465,
+  "sha256": "f330e6526a97bc3880bae5e75f45209bc98381042bb5ff0680d8fe3baa87f81b",
+  "raw_url": "https://raw.githubusercontent.com/Sai-Vidyut/SatQuery-AI/main/experiments/phase9b_geochat/assets/sentinel2_smoketest.png"
+}

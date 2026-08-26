@@ -1,0 +1,44 @@
+[project]
+name = "satquery-geochat-service"
+version = "0.1.0"
+description = "Standalone GeoChat-7B GPU inference service for SatQuery AI"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.10.0",
+    "httpx>=0.28.0",
+    "pillow>=10.0.0",
+    "numpy>=1.26.0",
+    "tifffile>=2024.8.0",
+]
+
+[project.optional-dependencies]
+gpu = [
+    "torch>=2.1.0",
+    "transformers==4.36.2",
+    "accelerate==0.25.0",
+    "bitsandbytes>=0.41.0",
+    "sentencepiece==0.1.99",
+    "einops==0.6.1",
+    "einops-exts==0.0.4",
+]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.scripts]
+geochat-service = "geochat_service.main:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["geochat_service*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

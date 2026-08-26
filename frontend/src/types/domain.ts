@@ -53,11 +53,121 @@ export interface ImageryResult {
 
 export interface QueryRequest {
   query: string;
-  aoi: AOI;
-  earlier_date: string;
-  later_date: string;
+  aoi?: AOI;
+  earlier_date?: string;
+  later_date?: string;
   sensor?: SensorType;
   preferences?: ImageryPreferences;
+  image_id?: string;
+  earlier_image_id?: string;
+  later_image_id?: string;
+  optical_image_id?: string;
+  sar_image_id?: string;
+}
+
+export type ImageModality = "optical" | "multispectral" | "sar";
+export type ImageFormat = "geotiff" | "tiff" | "png" | "jpeg";
+
+export interface ImageInput {
+  id: string;
+  modality: ImageModality;
+  format: ImageFormat;
+  filename: string;
+  width: number;
+  height: number;
+  georeferenced: boolean;
+  acquisition_datetime?: string | null;
+  benchmark_dataset?: boolean;
+  co_registered_benchmark?: boolean;
+  benchmark_pair_id?: string | null;
+  bounds?: number[] | null;
+  crs?: string | null;
+}
+
+export interface UploadImageResponse {
+  image: ImageInput;
+}
+
+export interface SingleImageVQAResult {
+  task: "single_image_vqa";
+  answer: string;
+  model_name: string;
+  model_version: string;
+  provider: "development" | "geochat_service";
+  provenance: string;
+  confidence?: number | null;
+  confidence_available: boolean;
+  input_image_id: string;
+  requested_modality: string;
+  inference_metadata?: Record<string, unknown>;
+}
+
+export interface SingleImageCaptionResult {
+  task: "single_image_caption";
+  description: string;
+  model_name: string;
+  model_version: string;
+  provider: "development" | "geochat_service";
+  provenance: string;
+  confidence?: number | null;
+  confidence_available: boolean;
+  input_image_id: string;
+  requested_modality: string;
+  inference_metadata?: Record<string, unknown>;
+}
+
+export interface CrossModalOpticalSARResult {
+  task: "cross_modal_optical_sar";
+  answer: string;
+  question: string;
+  optical_analysis: {
+    modality: string;
+    summary: string;
+    analyzer: string;
+    provider: string;
+    confidence_available: boolean;
+  };
+  sar_analysis: {
+    modality: string;
+    summary: string;
+    analyzer: string;
+    provider: string;
+    confidence_available: boolean;
+  };
+  fused_analysis: {
+    summary: string;
+    fusion_policy: string;
+    fused_region_count: number;
+    complementary_notes: string[];
+  };
+  co_registration_status: string;
+  co_registration_provenance: string;
+  optical_image_id: string;
+  sar_image_id: string;
+  provider: string;
+  provenance: string;
+  confidence?: number | null;
+  confidence_available: boolean;
+}
+
+export interface BiTemporalChangeResult {
+  task: "bi_temporal_change_vqa";
+  change_summary: string;
+  question: string;
+  changed_region_count: number;
+  change_map_available: boolean;
+  detector: string;
+  provider: "development" | "uploaded_cva";
+  provenance: string;
+  confidence?: number | null;
+  confidence_available: boolean;
+  earlier_image_id: string;
+  later_image_id: string;
+  earlier_acquisition: string;
+  later_acquisition: string;
+  earlier_date: string;
+  later_date: string;
+  inference_metadata?: Record<string, unknown>;
 }
 
 export interface Metric {
@@ -105,10 +215,15 @@ export interface AnalysisResult {
   session_id: string;
   answer: string;
   confidence: number;
+  confidence_available?: boolean;
   metrics: Metric[];
   evidence: EvidenceRegion[];
   trace: TraceStep[];
   mode: DataMode;
+  vqa?: SingleImageVQAResult | null;
+  caption?: SingleImageCaptionResult | null;
+  bi_temporal_change?: BiTemporalChangeResult | null;
+  cross_modal?: CrossModalOpticalSARResult | null;
 }
 
 export interface ApiResponse<T> {

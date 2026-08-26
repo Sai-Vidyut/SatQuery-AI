@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     query_planner: str = "deterministic"  # deterministic | llm
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    upload_dir: str = "data/uploads"
+    max_upload_size_mb: int = 256
+    geochat_vqa_provider: str = "development"  # development | geochat_service
+    geochat_service_url: str | None = None
+    geochat_model_id: str = "MBZUAI/geochat-7B"
+    geochat_service_timeout_s: float = 120.0
 
     @property
     def effective_change_detector(self) -> str:
@@ -30,6 +36,16 @@ class Settings(BaseSettings):
     @property
     def effective_sar_change_detector(self) -> str:
         return self.sar_change_detector or self.change_detector or self.imagery_provider
+
+    @property
+    def upload_dir_path(self) -> "Path":
+        from pathlib import Path
+
+        return Path(self.upload_dir)
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
 
 
 @lru_cache
