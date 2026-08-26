@@ -121,9 +121,12 @@ sys.path.insert(0, str(service_root))
 from geochat_service.patches import apply_geochat_patches, verify_geochat_patches
 
 root = Path(os.environ["GEOCHAT_SRC"])
+print("[geochat] applying Phase 9B patches")
 apply_geochat_patches(root)
+print("[geochat] Phase 9B patches applied")
 verify_geochat_patches(root)
-print(f"[geochat] Phase 9B patches applied and verified at {root}")
+print("[geochat] Phase 9B patches verified")
+print(f"[geochat] patch target: {root}")
 PY
 echo ""
 
