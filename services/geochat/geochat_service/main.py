@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -18,6 +20,9 @@ from geochat_service.schemas import (
     GeoChatVQAResponse,
 )
 
+logger = logging.getLogger("geochat_service")
+logging.basicConfig(level=logging.INFO)
+
 SERVICE_CONFIG = ServiceConfig.from_env()
 ENGINE = (
     FakeInferenceEngine(SERVICE_CONFIG)
@@ -26,13 +31,21 @@ ENGINE = (
 )
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    if SERVICE_CONFIG.eager_load and not isinstance(ENGINE, FakeInferenceEngine):
+def _start_background_load() -> None:
+    def _run() -> None:
         try:
             ENGINE.load()
         except ModelUnavailableError:
-            pass
+            logger.exception("[geochat] background model load failed")
+
+    threading.Thread(target=_run, daemon=True, name="geochat-model-load").start()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if SERVICE_CONFIG.eager_load and not isinstance(ENGINE, FakeInferenceEngine):
+        logger.info("[geochat] eager load enabled — starting background model load")
+        _start_background_load()
     yield
 
 
@@ -40,12 +53,18 @@ app = FastAPI(title="GeoChat Inference Service", version=SERVICE_CONFIG.service_
 
 
 def _health_status() -> GeoChatHealthResponse:
+    startup_state = getattr(ENGINE, "startup_state", "ready")
+    load_error = getattr(ENGINE, "load_error", None)
+
     if ENGINE.model_loaded:
         status = "ok"
-    elif isinstance(ENGINE, GeoChatInferenceEngine) and ENGINE.load_error:
+    elif startup_state == "starting":
         status = "degraded"
+    elif startup_state == "failed" or load_error:
+        status = "error"
     else:
-        status = "degraded" if SERVICE_CONFIG.eager_load else "ok"
+        status = "degraded"
+
     return GeoChatHealthResponse(
         status=status,
         model_loaded=ENGINE.model_loaded,
@@ -54,6 +73,8 @@ def _health_status() -> GeoChatHealthResponse:
         provider="geochat_service",
         service_version=SERVICE_CONFIG.service_version,
         load_strategy=ENGINE.load_strategy,
+        startup_state=startup_state,
+        load_error=load_error,
     )
 
 

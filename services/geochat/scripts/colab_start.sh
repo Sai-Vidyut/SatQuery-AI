@@ -1,45 +1,62 @@
 #!/usr/bin/env bash
-# Colab T4 launcher for the standalone GeoChat inference service (validation only).
-# Does NOT start the SatQuery backend. Does NOT use the development/fake engine.
+# Colab T4 launcher for the standalone GeoChat inference service (Phase 16 validation).
+# Uses the EXISTING services/geochat FastAPI app — no backend, no mock engine.
 #
-# Usage (Colab cell):
-#   !bash /content/SatQuery-AI/services/geochat/scripts/colab_start.sh
+# Run from the SatQuery-AI repository root:
+#   cd /content/SatQuery-AI
+#   bash services/geochat/scripts/colab_start.sh
 #
-# Optional environment variables (set before running):
-#   HF_TOKEN or HUGGINGFACE_HUB_TOKEN  — Hugging Face auth if required
-#   GEOCHAT_SRC                        — GeoChat upstream clone path (default: /content/geochat)
-#   GEOCHAT_MODEL_ID                   — default: MBZUAI/geochat-7B
-#   GEOCHAT_EAGER_LOAD                 — default: true (weights load when uvicorn starts)
-#   GEOCHAT_SERVICE_PORT               — default: 8080
+# Health check (second Colab cell while server is running):
+#   curl http://127.0.0.1:8000/health
 #
-# Health check (run in a second Colab cell while the server is running):
-#   curl http://127.0.0.1:8080/health
+# Colab reserves port 8080 for its Node process — default bind is 8000 here only.
+# Override: export GEOCHAT_PORT=8000  (or GEOCHAT_SERVICE_PORT)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+# --- Requirement 1: must be run from SatQuery-AI repository root ---
+if [[ ! -f "${REPO_ROOT}/services/geochat/geochat_service/main.py" ]]; then
+  echo "ERROR: Cannot locate services/geochat/geochat_service/main.py from script path." >&2
+  echo "       Expected SatQuery-AI layout at: ${REPO_ROOT}" >&2
+  exit 1
+fi
+
+if [[ "$(pwd -P)" != "$(cd "${REPO_ROOT}" && pwd -P)" ]]; then
+  echo "ERROR: Run this script from the SatQuery-AI repository root." >&2
+  echo "" >&2
+  echo "  cd ${REPO_ROOT}" >&2
+  echo "  bash services/geochat/scripts/colab_start.sh" >&2
+  exit 1
+fi
+
 GEOCHAT_REPO="${GEOCHAT_REPO:-https://github.com/mbzuai-oryx/GeoChat.git}"
 GEOCHAT_SRC="${GEOCHAT_SRC:-/content/geochat}"
 GEOCHAT_MODEL_ID="${GEOCHAT_MODEL_ID:-MBZUAI/geochat-7B}"
 GEOCHAT_SERVICE_HOST="${GEOCHAT_SERVICE_HOST:-0.0.0.0}"
-GEOCHAT_SERVICE_PORT="${GEOCHAT_SERVICE_PORT:-8080}"
+# Colab default 8000 (8080 is used by Colab's Node). GEOCHAT_PORT is a Colab-friendly alias.
+GEOCHAT_SERVICE_PORT="${GEOCHAT_PORT:-${GEOCHAT_SERVICE_PORT:-8000}}"
 GEOCHAT_EAGER_LOAD="${GEOCHAT_EAGER_LOAD:-true}"
 
 echo "============================================================"
 echo " SatQuery GeoChat service — Colab T4 validation launcher"
 echo "============================================================"
+echo "Repository:   ${REPO_ROOT}"
 echo "Service root: ${SERVICE_ROOT}"
 echo "GeoChat src:  ${GEOCHAT_SRC}"
 echo "Model:        ${GEOCHAT_MODEL_ID}"
-echo "Bind:         ${GEOCHAT_SERVICE_HOST}:${GEOCHAT_SERVICE_PORT}"
+echo "Listen:       ${GEOCHAT_SERVICE_HOST}:${GEOCHAT_SERVICE_PORT}"
 echo "Eager load:   ${GEOCHAT_EAGER_LOAD} (weights download on service start)"
+echo "Endpoints:    GET /health  POST /v1/vqa  POST /v1/caption"
 echo ""
 
-# Never use fake/development inference engine in Colab validation.
+# Requirement 10: never use fake/development inference engine.
 unset GEOCHAT_SERVICE_FAKE_ENGINE
 
-# Hugging Face auth — environment only; never hard-code tokens.
+# Requirement 6: HF auth from environment only.
 if [[ -n "${HF_TOKEN:-}" ]]; then
   export HF_TOKEN
   export HUGGINGFACE_HUB_TOKEN="${HUGGINGFACE_HUB_TOKEN:-$HF_TOKEN}"
@@ -52,9 +69,12 @@ else
 fi
 echo ""
 
-echo "--- GPU / CUDA probe ---"
+echo "--- Startup diagnostics ---"
 python3 - <<'PY'
+import platform
 import sys
+
+print(f"python:         {platform.python_version()}")
 
 try:
     import torch
@@ -65,12 +85,11 @@ except ImportError as exc:
 print(f"torch:          {torch.__version__}")
 print(f"cuda runtime:   {torch.version.cuda}")
 print(f"cuda available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    idx = torch.cuda.current_device()
-    print(f"gpu device:     {torch.cuda.get_device_name(idx)}")
-else:
-    print("ERROR: CUDA is not available. Select a GPU runtime before running this launcher.", file=sys.stderr)
+if not torch.cuda.is_available():
+    print("ERROR: CUDA GPU is unavailable. Select a T4 GPU runtime before running this launcher.", file=sys.stderr)
     raise SystemExit(1)
+idx = torch.cuda.current_device()
+print(f"gpu name:       {torch.cuda.get_device_name(idx)}")
 PY
 
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -80,7 +99,7 @@ else
 fi
 echo ""
 
-echo "--- Install GeoChat upstream source (no model weights yet) ---"
+echo "--- GeoChat upstream source (architecture only; no model weights yet) ---"
 if [[ -d "${GEOCHAT_SRC}/geochat" ]]; then
   echo "GeoChat source already present at ${GEOCHAT_SRC}"
 else
@@ -90,10 +109,26 @@ fi
 export GEOCHAT_SRC
 echo ""
 
-echo "--- Install services/geochat dependencies (Phase 9B pinned stack) ---"
-echo "Note: Colab torch is left untouched; only inference + service deps are installed."
-
+echo "--- Verify Phase 9B GeoChat patches before service start ---"
 export SERVICE_ROOT
+python3 - <<'PY'
+import os
+import sys
+from pathlib import Path
+
+service_root = Path(os.environ["SERVICE_ROOT"])
+sys.path.insert(0, str(service_root))
+from geochat_service.patches import apply_geochat_patches, verify_geochat_patches
+
+root = Path(os.environ["GEOCHAT_SRC"])
+apply_geochat_patches(root)
+verify_geochat_patches(root)
+print(f"[geochat] Phase 9B patches applied and verified at {root}")
+PY
+echo ""
+
+echo "--- Install services/geochat dependencies (Colab torch untouched) ---"
+export SERVICE_ROOT REPO_ROOT
 python3 - <<'PY'
 import os
 import subprocess
@@ -105,16 +140,9 @@ hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
 if hf_token:
     os.environ["HUGGING_FACE_HUB_TOKEN"] = hf_token
 
-REMOVE_PACKAGES = [
-    "sentence-transformers",
-    "gradio",
-    "gradio_client",
-]
-print("Removing Colab packages not required for GeoChat inference:", REMOVE_PACKAGES)
-subprocess.run(
-    [sys.executable, "-m", "pip", "uninstall", "-y", *REMOVE_PACKAGES],
-    check=False,
-)
+# Remove Colab packages that pin incompatible transformers stacks.
+REMOVE_PACKAGES = ["sentence-transformers", "gradio", "gradio_client"]
+subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", *REMOVE_PACKAGES], check=False)
 
 PINNED = [
     "transformers==4.36.2",
@@ -126,7 +154,7 @@ PINNED = [
     "psutil>=5.9.0",
     "huggingface_hub>=0.20.0,<1.0",
 ]
-print("Installing pinned inference stack:", ", ".join(PINNED))
+print("Installing pinned inference stack (torch not reinstalled):", ", ".join(PINNED))
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", *PINNED])
 
 cuda_version = torch.version.cuda or "unknown"
@@ -141,13 +169,13 @@ print(f"Installing bitsandbytes for CUDA {cuda_version}: {bnb_spec}")
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", bnb_spec])
 
 service_root = os.environ["SERVICE_ROOT"]
-print(f"Installing GeoChat service package from {service_root} (base deps only; no torch reinstall)")
+print(f"Installing GeoChat service package: {service_root}")
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "-e", service_root])
 
 import bitsandbytes as bnb
 
 if not torch.cuda.is_available():
-    raise SystemExit("CUDA unavailable after dependency install.")
+    raise SystemExit("ERROR: CUDA unavailable after dependency install.")
 
 layer = bnb.nn.Linear8bitLt(32, 32, has_fp16_weights=False).to("cuda")
 x = torch.randn(1, 32, device="cuda", dtype=torch.float16)
@@ -159,41 +187,40 @@ print("bitsandbytes CUDA verification: PASSED")
 PY
 echo ""
 
-echo "--- Loading strategy (implemented in geochat_service.inference) ---"
-echo "  load_in_8bit=True"
-echo "  device_map=auto"
-echo "  low_cpu_mem_usage=True"
-echo "  deferred CLIP 336->504 interpolation after checkpoint load"
-echo "  load_strategy=geochat_upstream_8bit_device_map_auto_deferred_clip504"
+echo "--- Phase 9B loading strategy (geochat_service.inference.GeoChatInferenceEngine) ---"
+echo "  model:            ${GEOCHAT_MODEL_ID}"
+echo "  load_in_8bit:     True"
+echo "  device_map:       auto"
+echo "  low_cpu_mem_usage: True"
+echo "  clip_interpolate: deferred 336px -> 504px after checkpoint load"
+echo "  load_strategy:    geochat_upstream_8bit_device_map_auto_deferred_clip504"
+echo "  image API:        base64 bytes only (no filesystem paths exposed)"
 echo ""
 
-SERVICE_URL="http://127.0.0.1:${GEOCHAT_SERVICE_PORT}"
-PUBLIC_URL="http://${GEOCHAT_SERVICE_HOST}:${GEOCHAT_SERVICE_PORT}"
-
-echo "--- Startup summary ---"
-echo "Provider:     geochat_service (real GeoChatInferenceEngine)"
-echo "Fake engine:  disabled (GEOCHAT_SERVICE_FAKE_ENGINE unset)"
-echo "Backend:      NOT started (GeoChat service only)"
-echo "Service URL:  ${SERVICE_URL}  (local health check)"
-echo "Bind address: ${PUBLIC_URL}"
+echo "--- Service summary ---"
+echo "Provider:       geochat_service (real inference engine)"
+echo "Fake engine:    disabled"
+echo "SatQuery backend: NOT started"
+echo "Listening:      ${GEOCHAT_SERVICE_HOST}:${GEOCHAT_SERVICE_PORT}"
 echo ""
-echo "Health check (run in another Colab cell while server is running):"
+echo "Local health check (run in another Colab cell while this cell stays alive):"
 echo "  curl http://127.0.0.1:${GEOCHAT_SERVICE_PORT}/health"
 echo ""
-echo "SatQuery backend (run on your machine, not in Colab):"
-echo "  export GEOCHAT_VQA_PROVIDER=geochat_service"
-echo "  export GEOCHAT_SERVICE_URL=<colab-tunnel-or-public-url>"
-echo ""
-echo "Starting uvicorn — model weights will download now (first start may take several minutes)..."
+if [[ "${1:-}" == "--setup-only" ]]; then
+  echo "Setup complete (--setup-only; uvicorn not started)."
+  exit 0
+fi
+
+echo "Starting uvicorn via Python supervisor (captures exit code + logs)..."
 echo "============================================================"
 
 export GEOCHAT_MODEL_ID
 export GEOCHAT_EAGER_LOAD
 export GEOCHAT_SERVICE_HOST
 export GEOCHAT_SERVICE_PORT
-export PYTHONPATH="${GEOCHAT_SRC}:${SERVICE_ROOT}:${PYTHONPATH:-}"
 
-exec python3 -m uvicorn geochat_service.main:app \
+# Foreground supervisor keeps Colab cell alive and records exit status.
+exec python3 "${SCRIPT_DIR}/colab_supervisor.py" \
+  --skip-setup \
   --host "${GEOCHAT_SERVICE_HOST}" \
-  --port "${GEOCHAT_SERVICE_PORT}" \
-  --log-level info
+  --port "${GEOCHAT_SERVICE_PORT}"

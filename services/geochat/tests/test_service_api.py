@@ -27,6 +27,7 @@ def test_health(client):
     assert body["model_name"] == "MBZUAI/geochat-7B"
     assert body["model_loaded"] is True
     assert body["service_version"]
+    assert body["startup_state"] == "ready"
 
 
 def test_valid_vqa_request(client):

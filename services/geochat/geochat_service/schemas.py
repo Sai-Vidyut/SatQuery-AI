@@ -107,3 +107,5 @@ class GeoChatHealthResponse(BaseModel):
     provider: Literal["geochat_service"] = "geochat_service"
     service_version: str
     load_strategy: str | None = None
+    startup_state: Literal["idle", "starting", "ready", "failed"] | None = None
+    load_error: str | None = None

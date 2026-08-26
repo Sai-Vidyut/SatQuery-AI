@@ -1,55 +1,76 @@
-# GeoChat Service — Google Colab T4 Validation
+# GeoChat Service — Google Colab T4 Validation (Phase 16)
 
-Temporary Colab launcher for **real** `MBZUAI/geochat-7B` inference via the existing `services/geochat` FastAPI service.
+Temporary Colab launcher for **real** `MBZUAI/geochat-7B` inference using the **existing** `services/geochat` FastAPI service.
 
-This path is for **Phase 16 validation only**. It does **not** start the SatQuery backend and does **not** use the development mock provider.
+- Starts only the GeoChat HTTP service (`GET /health`, `POST /v1/vqa`, `POST /v1/caption`)
+- Does **not** start the SatQuery backend
+- Does **not** use the development/mock provider
+- Preserves the existing byte/base64 image API (no filesystem paths)
 
-## What this runs
+**Colab port note:** Google Colab reserves **port 8080** for its Node process (PID 7). Do **not** bind GeoChat to 8080. Colab validation uses **port 8000** only.
 
-```
-Colab T4  -->  services/geochat (FastAPI :8080)  -->  MBZUAI/geochat-7B
-```
+---
 
-Your local SatQuery backend connects over HTTP:
+## Recommended: one-click notebook
 
-```bash
-export GEOCHAT_VQA_PROVIDER=geochat_service
-export GEOCHAT_SERVICE_URL=http://<colab-public-url>:8080
-```
+Upload **`services/geochat/colab_phase16_validation.ipynb`** to Google Colab, set runtime to **T4 GPU**, add Colab Secret **`HF_TOKEN`**, then **Runtime → Run all**.
 
-## Prerequisites
+The notebook orchestrates clone, service start on **:8000**, health polling, VQA, caption, backend adapter validation, and optional ngrok on **8000**. Artifacts: `/content/phase16_geochat_validation/`.
 
-1. **Google Colab** with **T4 GPU** runtime (`Runtime` → `Change runtime type` → `T4 GPU`)
-2. Clone this repository in Colab:
+---
+
+## Manual shell launcher (alternative)
+
+### 1. Clone the repository
 
 ```python
 !git clone https://github.com/Sai-Vidyut/SatQuery-AI.git /content/SatQuery-AI
+%cd /content/SatQuery-AI
 ```
 
-3. **Optional:** Hugging Face token if your environment requires authenticated downloads:
+### 2. Configure GPU runtime
+
+In Colab: **Runtime → Change runtime type → T4 GPU**
+
+### 3. Configure HF_TOKEN (if required)
+
+Add Colab Secret **`HF_TOKEN`** (sidebar key icon). The launcher reads `HF_TOKEN` or `HUGGINGFACE_HUB_TOKEN` from the environment only — never hardcoded.
+
+### 4. Start the GeoChat service
+
+**Must run from the repository root.** Default listen port is **8000** (not 8080).
+
+```python
+%cd /content/SatQuery-AI
+!bash services/geochat/scripts/colab_start.sh
+```
+
+Override port (optional):
 
 ```python
 import os
-os.environ["HF_TOKEN"] = "hf_..."  # never commit; Colab secret recommended
+os.environ["GEOCHAT_PORT"] = "8000"  # Colab default; do not use 8080
+!bash services/geochat/scripts/colab_start.sh
 ```
 
-The launcher reads `HF_TOKEN` or `HUGGINGFACE_HUB_TOKEN` from the environment only.
+This cell stays alive while uvicorn runs in the foreground. First start downloads `MBZUAI/geochat-7B` weights (several minutes).
 
-## Quick start
+Loading uses the verified Phase 9B strategy implemented in `geochat_service/inference.py`:
 
-**Cell 1 — start the service** (blocks while running; first start downloads weights):
+- `load_in_8bit=True`
+- `device_map="auto"`
+- `low_cpu_mem_usage=True`
+- deferred CLIP 336→504 interpolation after checkpoint load
+
+### 5. Verify `/health` (second Colab cell)
+
+While the service cell is still running:
 
 ```python
-!bash /content/SatQuery-AI/services/geochat/scripts/colab_start.sh
+!curl -s http://127.0.0.1:8000/health | python -m json.tool
 ```
 
-**Cell 2 — health check** (open a new cell while Cell 1 is running):
-
-```bash
-curl http://127.0.0.1:8080/health
-```
-
-Expected response fields:
+Expected:
 
 ```json
 {
@@ -62,70 +83,92 @@ Expected response fields:
 }
 ```
 
-## What the launcher installs
+### 6. Expose port 8000 for Phase 16 validation from your machine
 
-Only what `services/geochat` needs:
+`127.0.0.1:8000` is only reachable inside Colab. For local SatQuery backend validation, expose port **8000** temporarily. **Do not tunnel 8080** (Colab Node).
 
-| Component | Source |
-|-----------|--------|
-| FastAPI, uvicorn, pydantic, pillow, numpy, tifffile | `pip install -e services/geochat` |
-| transformers 4.36.2, accelerate, bitsandbytes, sentencepiece, einops | Phase 9B pinned Colab stack |
-| torch | **Colab pre-installed** (not reinstalled) |
-| GeoChat upstream source | `git clone` to `/content/geochat` |
-| SatQuery backend | **Not installed** |
+#### Option A — ngrok (recommended)
 
-Model weights (`MBZUAI/geochat-7B`) are **not** downloaded during `pip install`. They load when uvicorn starts (`GEOCHAT_EAGER_LOAD=true`).
-
-## Verified loading strategy
-
-Implemented in `geochat_service/inference.py` (same as Phase 9B Colab smoke test):
-
-- `load_in_8bit=True`
-- `device_map="auto"`
-- `low_cpu_mem_usage=True`
-- Deferred CLIP 336→504 interpolation after checkpoint load
-- `geochat_service.patches.apply_geochat_patches()` on cloned GeoChat repo
-
-## Environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GEOCHAT_SRC` | `/content/geochat` | Cloned GeoChat upstream repo |
-| `GEOCHAT_MODEL_ID` | `MBZUAI/geochat-7B` | Hugging Face model id |
-| `GEOCHAT_EAGER_LOAD` | `true` | Load model on service startup |
-| `GEOCHAT_SERVICE_HOST` | `0.0.0.0` | Bind address |
-| `GEOCHAT_SERVICE_PORT` | `8080` | Listen port |
-| `HF_TOKEN` | — | Optional Hugging Face auth |
-
-`GEOCHAT_SERVICE_FAKE_ENGINE` is explicitly **unset** by the launcher.
-
-## Connecting from your machine
-
-Colab `127.0.0.1` is only reachable inside the notebook. To validate from a local SatQuery backend, expose port 8080 (e.g. Colab's port forwarding, `ngrok`, or Cloudflare tunnel) and set:
-
-```bash
-export GEOCHAT_SERVICE_URL=http://<public-host>:8080
-export GEOCHAT_REAL_SERVICE_TEST=true
-cd backend && uv run python ../services/geochat/scripts/run_phase16_validation.py
+```python
+!pip install -q pyngrok
+from pyngrok import ngrok
+public_url = ngrok.connect(8000)
+print("Public GeoChat service URL:", public_url)
 ```
 
-## Validation artifacts
+#### Option B — localtunnel
 
-Save results to `services/geochat/validation_artifacts/` (gitignored) per `docs/SIH_PHASE16_VALIDATION.md`.
+```python
+!npm install -g localtunnel
+!lt --port 8000
+```
+
+### Connect your local SatQuery backend
+
+Use `GEOCHAT_SERVICE_URL` with your tunnel URL (any port/host — not hardcoded in production):
+
+```bash
+export GEOCHAT_VQA_PROVIDER=geochat_service
+export GEOCHAT_SERVICE_URL=https://<your-tunnel-host>   # ngrok / localtunnel URL
+export GEOCHAT_MODEL_ID=MBZUAI/geochat-7B
+
+cd backend
+uv run python ../services/geochat/scripts/run_phase16_validation.py
+```
+
+Or run the gated integration test:
+
+```bash
+GEOCHAT_REAL_SERVICE_TEST=true GEOCHAT_SERVICE_URL=https://<your-tunnel-host> \
+  uv run pytest tests/test_phase14_geochat_service.py -k real_service -v
+```
+
+---
+
+## What gets installed
+
+| Component | Installed by launcher? |
+|-----------|------------------------|
+| `services/geochat` (FastAPI app) | ✅ `pip install -e services/geochat` |
+| transformers 4.36.2, bitsandbytes, accelerate, etc. | ✅ Phase 9B pinned stack |
+| Colab `torch` / CUDA | ❌ not reinstalled |
+| GeoChat upstream (`mbzuai-oryx/GeoChat`) | ✅ cloned to `/content/geochat` |
+| SatQuery `backend/` | ❌ not started |
+| Model weights | ⏳ on first uvicorn start only |
+
+## Environment variables (Colab)
+
+| Variable | Default (Colab) | Description |
+|----------|-----------------|-------------|
+| `GEOCHAT_PORT` | `8000` | Colab-friendly port alias (preferred) |
+| `GEOCHAT_SERVICE_PORT` | `8000` | Passed to `geochat_service` config |
+| `GEOCHAT_SRC` | `/content/geochat` | GeoChat upstream clone path |
+| `GEOCHAT_MODEL_ID` | `MBZUAI/geochat-7B` | Hugging Face model id |
+| `GEOCHAT_EAGER_LOAD` | `true` | Load model when service starts |
+| `GEOCHAT_SERVICE_HOST` | `0.0.0.0` | Bind address |
+| `HF_TOKEN` | — | Hugging Face auth (Colab Secret) |
+
+Production GPU hosts may still use port **8080** via `GEOCHAT_SERVICE_URL` — that default is unchanged in `geochat_service/config.py`.
+
+`GEOCHAT_SERVICE_FAKE_ENGINE` is explicitly unset.
 
 ## Troubleshooting
 
-| Symptom | Action |
-|---------|--------|
-| `CUDA is not available` | Switch Colab runtime to T4 GPU |
-| `GEOCHAT_SRC does not contain geochat package` | Re-run launcher (clone step failed) |
-| `bitsandbytes failed CUDA initialization` | Restart runtime; re-run launcher |
-| Health shows `model_loaded: false` | Wait for first-time HF download; check `HF_TOKEN` if auth required |
-| OOM on T4 | Restart runtime; ensure no other GPU processes |
+| Symptom | Fix |
+|---------|-----|
+| `Address already in use` on 8080 | Use port **8000** — Colab Node owns 8080 |
+| `Run this script from the SatQuery-AI repository root` | `%cd /content/SatQuery-AI` then re-run |
+| `CUDA GPU is unavailable` | Runtime → T4 GPU, restart runtime |
+| `bitsandbytes` CUDA error | Restart runtime; re-run launcher |
+| `model_loaded: false` in `/health` | Wait for HF download; check `HF_TOKEN` |
+| Tunnel connects but health fails | Ensure uvicorn is listening on **8000** |
 
 ## What this does NOT do
 
-- Does not start `backend/` or the SatQuery API
-- Does not use `GEOCHAT_VQA_PROVIDER=development`
-- Does not modify the service API or request/response contracts
-- Does not commit tokens, weights, or validation imagery
+- Does not kill or interfere with Colab's Node process on port 8080
+- Does not modify SatQuery backend behavior or production API contracts
+- Does not modify the Phase 9B smoke-test notebook
+- Does not add fake/mock inference
+- Does not commit tokens, weights, or imagery
+
+See also: `docs/SIH_PHASE16_VALIDATION.md`

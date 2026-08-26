@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from geochat_service.config import LOAD_STRATEGY, PROMPT_SYSTEM, ServiceConfig
-from geochat_service.patches import apply_geochat_patches
+from geochat_service.loading import load_geochat_runtime
 from geochat_service.preprocessing import prepare_geochat_image
 from geochat_service.schemas import (
     GeoChatCaptionRequest,
@@ -22,6 +23,8 @@ from geochat_service.schemas import (
     GeoChatVQAResponse,
 )
 
+StartupState = Literal["idle", "starting", "ready", "failed"]
+
 
 class ModelUnavailableError(RuntimeError):
     """Raised when GeoChat weights cannot be loaded or CUDA is unavailable."""
@@ -32,6 +35,8 @@ class InferenceEngine(Protocol):
     model_name: str
     load_strategy: str | None
     gpu_name: str | None
+    startup_state: StartupState
+    load_error: str | None
 
     def load(self) -> None: ...
 
@@ -57,10 +62,16 @@ class GeoChatInferenceEngine:
         self._config = config
         self._runtime: GeoChatRuntime | None = None
         self._load_error: str | None = None
+        self._startup_state: StartupState = "idle"
+        self._load_lock = threading.Lock()
+
+    @property
+    def startup_state(self) -> StartupState:
+        return self._startup_state
 
     @property
     def model_loaded(self) -> bool:
-        return self._runtime is not None
+        return self._startup_state == "ready" and self._runtime is not None
 
     @property
     def model_name(self) -> str:
@@ -90,69 +101,41 @@ class GeoChatInferenceEngine:
         return root
 
     def load(self) -> None:
-        if self._runtime is not None:
-            return
+        with self._load_lock:
+            if self._startup_state == "ready":
+                return
+            if self._startup_state == "failed":
+                raise ModelUnavailableError(self._load_error or "GeoChat model load failed.")
+            if self._startup_state == "starting":
+                return
+            self._startup_state = "starting"
+            self._load_error = None
+
         try:
-            import torch
-            from transformers import AutoTokenizer
-
-            if not torch.cuda.is_available():
-                raise ModelUnavailableError("CUDA GPU is required for GeoChat inference service.")
-
             geochat_root = self._ensure_geochat_src()
-            apply_geochat_patches(geochat_root)
-            if str(geochat_root) not in sys.path:
-                sys.path.insert(0, str(geochat_root))
-
-            from geochat.model.language_model.geochat_llama import GeoChatLlamaForCausalLM
-
-            if self._config.hf_token:
-                import os
-
-                os.environ.setdefault("HF_TOKEN", self._config.hf_token)
-                os.environ.setdefault("HUGGINGFACE_HUB_TOKEN", self._config.hf_token)
-
-            load_kwargs = {
-                "device_map": "auto",
-                "load_in_8bit": True,
-                "low_cpu_mem_usage": True,
-            }
-            tokenizer = AutoTokenizer.from_pretrained(self._config.model_id, use_fast=False)
-            model = GeoChatLlamaForCausalLM.from_pretrained(self._config.model_id, **load_kwargs)
-
-            vision_tower = model.get_vision_tower()
-            pe = vision_tower.vision_tower.vision_model.embeddings.position_embedding.weight
-            if getattr(pe, "is_meta", False):
-                raise ModelUnavailableError(
-                    "Vision tower position embeddings are on meta device after load."
-                )
-            n_pos = int(pe.shape[0])
-            if n_pos == 577:
-                vision_tower.clip_interpolate_embeddings(image_size=504, patch_size=14)
-            elif n_pos != 1297:
-                raise ModelUnavailableError(f"Unexpected CLIP position tokens: {n_pos}")
-            vision_tower.is_loaded = True
-            vision_tower.to(device="cuda", dtype=torch.float16)
-            image_processor = vision_tower.image_processor
-            model.eval()
-
-            device = torch.device("cuda")
-            for param in model.parameters():
-                if param.device.type == "cuda":
-                    device = param.device
-                    break
-
-            gpu_name = torch.cuda.get_device_name(device.index or 0)
-            self._runtime = GeoChatRuntime(
-                model=model,
-                tokenizer=tokenizer,
-                image_processor=image_processor,
-                device=device,
-                load_strategy=LOAD_STRATEGY,
-                gpu_name=gpu_name,
+            loaded = load_geochat_runtime(
+                model_id=self._config.model_id,
+                geochat_src=geochat_root,
+                hf_token=self._config.hf_token,
             )
+            runtime = GeoChatRuntime(
+                model=loaded["model"],
+                tokenizer=loaded["tokenizer"],
+                image_processor=loaded["image_processor"],
+                device=loaded["device"],
+                load_strategy=loaded["load_strategy"],
+                gpu_name=loaded["gpu_name"],
+            )
+            with self._load_lock:
+                self._runtime = runtime
+                self._startup_state = "ready"
+                self._load_error = None
         except Exception as exc:
-            self._load_error = str(exc)
+            with self._load_lock:
+                self._startup_state = "failed"
+                self._load_error = str(exc)
+                self._runtime = None
+            print(f"[geochat] model load failed: {exc}", flush=True)
             raise ModelUnavailableError(str(exc)) from exc
 
     def _provenance(self, runtime_ms: int, device: str | None = None) -> GeoChatServiceProvenance:
@@ -173,7 +156,7 @@ class GeoChatInferenceEngine:
         parameters: GeoChatInferenceParameters,
         preprocess_meta: dict,
     ) -> tuple[str, dict]:
-        if self._runtime is None:
+        if self._runtime is None or not self.model_loaded:
             raise ModelUnavailableError("GeoChat model is not loaded.")
         import torch
         from geochat.constants import IMAGE_TOKEN_INDEX
@@ -212,6 +195,8 @@ class GeoChatInferenceEngine:
 
     def run_vqa(self, request: GeoChatVQARequest) -> GeoChatVQAResponse:
         self.load()
+        if not self.model_loaded:
+            raise ModelUnavailableError("GeoChat model is still loading or failed to load.")
         pil_image, preprocess_meta = prepare_geochat_image(request.image, request.image_metadata)
         prompt = f"{PROMPT_SYSTEM} USER: <image>\n{request.question} ASSISTANT:"
         t0 = time.time()
@@ -235,6 +220,8 @@ class GeoChatInferenceEngine:
 
     def run_caption(self, request: GeoChatCaptionRequest) -> GeoChatCaptionResponse:
         self.load()
+        if not self.model_loaded:
+            raise ModelUnavailableError("GeoChat model is still loading or failed to load.")
         pil_image, preprocess_meta = prepare_geochat_image(request.image, request.image_metadata)
         prompt = f"{PROMPT_SYSTEM} USER: <image>\n{request.user_request} ASSISTANT:"
         t0 = time.time()
@@ -267,6 +254,8 @@ class FakeInferenceEngine:
         self.model_name = config.model_id
         self.load_strategy = "fake_engine"
         self.gpu_name = "fake-gpu"
+        self.startup_state: StartupState = "ready"
+        self.load_error: str | None = None
 
     def load(self) -> None:
         return None
