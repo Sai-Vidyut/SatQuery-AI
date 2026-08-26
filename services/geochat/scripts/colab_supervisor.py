@@ -106,13 +106,16 @@ def _build_uvicorn_cmd(host: str, port: int) -> list[str]:
 
 
 def _build_env() -> dict[str, str]:
-    geochat_src = os.environ.get("GEOCHAT_SRC", "/content/geochat")
+    """Build uvicorn child environment, preserving GEOCHAT_SRC from the parent process."""
     env = os.environ.copy()
+    # Colab launcher convention (matches colab_start.sh default when parent omitted export).
+    geochat_src = env.get("GEOCHAT_SRC") or "/content/geochat"
+    env["GEOCHAT_SRC"] = geochat_src
     env["PYTHONUNBUFFERED"] = "1"
     env.setdefault("GEOCHAT_MODEL_ID", "MBZUAI/geochat-7B")
     env.setdefault("GEOCHAT_EAGER_LOAD", "true")
     env.setdefault("GEOCHAT_SERVICE_HOST", "0.0.0.0")
-    env.setdefault("GEOCHAT_SERVICE_PORT", os.environ.get("GEOCHAT_PORT", "8000"))
+    env.setdefault("GEOCHAT_SERVICE_PORT", env.get("GEOCHAT_PORT", "8000"))
     env.pop("GEOCHAT_SERVICE_FAKE_ENGINE", None)
     pythonpath_parts = [geochat_src, str(SERVICE_ROOT)]
     existing = env.get("PYTHONPATH", "")
@@ -161,6 +164,7 @@ def supervise(
 
         env = _build_env()
         cmd = _build_uvicorn_cmd(host, port)
+        log.write(f"[supervisor] GEOCHAT_SRC={env['GEOCHAT_SRC']}")
         log.write("[supervisor] launching uvicorn (direct python subprocess, no shell)")
         log.write("[supervisor] cmd: " + " ".join(cmd))
 

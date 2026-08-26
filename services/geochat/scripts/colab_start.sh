@@ -217,6 +217,7 @@ fi
 echo "Starting uvicorn via Python supervisor (captures exit code + logs)..."
 echo "============================================================"
 
+export GEOCHAT_SRC
 export GEOCHAT_MODEL_ID
 export GEOCHAT_EAGER_LOAD
 export GEOCHAT_SERVICE_HOST
