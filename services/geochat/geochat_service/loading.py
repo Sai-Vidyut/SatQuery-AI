@@ -20,6 +20,30 @@ PHASE9B_LOAD_KWARGS = {
 }
 
 
+def _resolve_load_max_memory() -> dict | None:
+    """Optional accelerate max_memory caps — critical on Colab ~12 GB system RAM."""
+    import os
+
+    import torch
+
+    gpu_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_GPU")
+    cpu_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_CPU")
+    if gpu_limit or cpu_limit:
+        out: dict = {}
+        if gpu_limit and torch.cuda.is_available():
+            out[0] = gpu_limit
+        if cpu_limit:
+            out["cpu"] = cpu_limit
+        return out or None
+
+    profile = os.environ.get("GEOCHAT_COLAB_MEMORY_PROFILE", "").lower()
+    if profile in {"1", "true", "colab"} and torch.cuda.is_available():
+        props = torch.cuda.get_device_properties(torch.cuda.current_device())
+        gpu_gib = max(10, int(props.total_memory / (1024**3) * 0.88))
+        return {0: f"{gpu_gib}GiB", "cpu": "4GiB"}
+    return None
+
+
 def _checkpoint(message: str) -> None:
     print(f"[geochat] {message}", flush=True)
 
@@ -93,13 +117,18 @@ def load_geochat_runtime(
     tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=False)
 
     _checkpoint(f"loading GeoChat checkpoint ({LOAD_STRATEGY})")
+    load_kwargs = dict(PHASE9B_LOAD_KWARGS)
+    max_memory = _resolve_load_max_memory()
+    if max_memory:
+        load_kwargs["max_memory"] = max_memory
+        _checkpoint(f"max_memory caps: {max_memory}")
     _checkpoint(
         "load kwargs: "
-        f"device_map={PHASE9B_LOAD_KWARGS['device_map']!r}, "
-        f"load_in_8bit={PHASE9B_LOAD_KWARGS['load_in_8bit']!r}, "
-        f"low_cpu_mem_usage={PHASE9B_LOAD_KWARGS['low_cpu_mem_usage']!r}"
+        f"device_map={load_kwargs['device_map']!r}, "
+        f"load_in_8bit={load_kwargs['load_in_8bit']!r}, "
+        f"low_cpu_mem_usage={load_kwargs['low_cpu_mem_usage']!r}"
     )
-    model = GeoChatLlamaForCausalLM.from_pretrained(model_id, **PHASE9B_LOAD_KWARGS)
+    model = GeoChatLlamaForCausalLM.from_pretrained(model_id, **load_kwargs)
     _checkpoint("checkpoint loaded")
 
     # Do NOT call vision_tower.load_model() — reloads CLIP from scratch (Phase 9B cell 6).
