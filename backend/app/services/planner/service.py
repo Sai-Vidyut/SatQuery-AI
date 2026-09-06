@@ -82,6 +82,7 @@ def _user_prompt(request: QueryRequest) -> str:
     payload: dict[str, object] = {
         "query": request.query,
         "allowed_tools": [
+            "imagery_policy",
             "fetch_imagery",
             "detect_change",
             "analyze_semantics",
@@ -98,6 +99,7 @@ def _user_prompt(request: QueryRequest) -> str:
         "allowed_intents": [
             "spectral_change",
             "construction",
+            "building_temporal_change",
             "radar_change",
             "multimodal_comparison",
             "single_image_vqa",

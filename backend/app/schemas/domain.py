@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.vqa import SingleImageCaptionResult, SingleImageVQAResult
 from app.schemas.bi_temporal_change import BiTemporalChangeResult
+from app.schemas.imagery_policy import ImageryPolicyReport
 
 class SensorType(str, Enum):
     SENTINEL_2 = "sentinel-2"
@@ -243,6 +244,7 @@ class AnalysisResult(BaseModel):
     caption: SingleImageCaptionResult | None = None
     bi_temporal_change: BiTemporalChangeResult | None = None
     cross_modal: "CrossModalOpticalSARResult | None" = None
+    imagery_policy: ImageryPolicyReport | None = None
 
 
 class ChangeDetectionInput(BaseModel):

@@ -12,10 +12,11 @@ from app.schemas.planning import (
     RequestedModality,
     SensorRequirement,
 )
+from app.services.building_temporal_intent import is_building_temporal_query
 from app.services.single_image_intent import single_image_intent_from_query
 
 BUILDING_CONSTRUCTION_PROFILE = "building_construction"
-CONSTRUCTION_KEYWORDS = frozenset({"construction", "building", "built", "development"})
+CONSTRUCTION_KEYWORDS = frozenset({"construction", "built", "development"})
 SAR_KEYWORDS = frozenset({"sar", "radar", "sentinel-1", "sentinel1", "backscatter"})
 MULTIMODAL_KEYWORDS = frozenset({"optical", "radar", "compare", "multimodal"})
 
@@ -37,8 +38,11 @@ BASE_TOOLS = [
 
 
 def _intent_from_query(query: str) -> QueryIntent:
+    if is_building_temporal_query(query):
+        return QueryIntent.BUILDING_TEMPORAL_CHANGE
+
     tokens = _extract_tokens(query)
-    has_construction = bool(tokens & CONSTRUCTION_KEYWORDS)
+    has_construction = bool(tokens & CONSTRUCTION_KEYWORDS) or "building" in tokens
     has_sar = bool(tokens & SAR_KEYWORDS)
     has_multimodal = bool(tokens & MULTIMODAL_KEYWORDS) or (
         "optical" in tokens and ("radar" in tokens or "sar" in tokens)
@@ -138,6 +142,22 @@ def build_deterministic_plan(
         )
 
     intent = _intent_from_query(request.query)
+
+    if intent == QueryIntent.BUILDING_TEMPORAL_CHANGE:
+        return QueryAnalysisPlan(
+            user_intent=intent,
+            requested_modalities=[RequestedModality.OPTICAL],
+            analysis_profile=AnalysisProfileName.NONE,
+            required_tools=[PlannerToolName.IMAGERY_POLICY],
+            earlier_date=request.earlier_date,
+            later_date=request.later_date,
+            sensor_requirement=SensorRequirement.SENTINEL_2,
+            user_intent_summary=(
+                "Route to building-instance temporal imagery policy "
+                "(segmentation not yet implemented)."
+            ),
+            planner=planner,  # type: ignore[arg-type]
+        )
 
     if intent == QueryIntent.RADAR_CHANGE:
         return QueryAnalysisPlan(

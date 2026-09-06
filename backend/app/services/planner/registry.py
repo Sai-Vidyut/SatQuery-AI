@@ -5,6 +5,7 @@ from app.schemas.planning import PlannerToolName
 REGISTERED_PLANNER_TOOLS: frozenset[PlannerToolName] = frozenset(PlannerToolName)
 
 TOOL_DESCRIPTIONS: dict[PlannerToolName, str] = {
+    PlannerToolName.IMAGERY_POLICY: "Evaluate catalog/upload imagery suitability for the product mode.",
     PlannerToolName.FETCH_IMAGERY: "Acquire Sentinel imagery for the AOI and date range.",
     PlannerToolName.DETECT_CHANGE: "Run optical CVA or SAR change detection on fetched imagery.",
     PlannerToolName.ANALYZE_SEMANTICS: "Run Dynamic World built semantic analysis on CVA regions.",

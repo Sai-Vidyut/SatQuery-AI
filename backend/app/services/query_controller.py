@@ -38,6 +38,7 @@ from app.schemas.domain import (
 from app.schemas.change_understanding import ChangeUnderstandingToolInput
 from app.schemas.input import ImageInput, ImageModality, InputValidationResult
 from app.schemas.planning import QueryAnalysisPlan, QueryIntent, SensorRequirement
+from app.schemas.imagery_policy import ImageryProductMode, PolicyDecision, TemporalImageryResolution
 from app.schemas.vqa import (
     GeoChatCaptionInput,
     GeoChatCaptionParameters,
@@ -47,6 +48,7 @@ from app.schemas.vqa import (
 from app.services.answer_engine import AnswerEngine
 from app.services.planner.service import plan_query
 from app.services.session_store import SessionStore, session_store
+from app.services.temporal_imagery_resolver import TemporalImageryResolver
 from app.schemas.cross_modal import (
     CrossModalFusionInput,
     OpticalAnalysisInput,
@@ -86,6 +88,7 @@ class QueryController:
         self._optical_analysis = UploadedOpticalAnalysisTool()
         self._sar_analysis = UploadedSARAnalysisTool()
         self._cross_modal_fusion = CrossModalFusionTool()
+        self._imagery_resolver = TemporalImageryResolver()
 
     async def submit(self, request: QueryRequest) -> AnalysisResult:
         if request.is_cross_modal_upload:
@@ -408,6 +411,9 @@ class QueryController:
         plan_output = await self._run_plan_step(trace, request)
         plan = plan_output.plan
 
+        if plan.user_intent == QueryIntent.BUILDING_TEMPORAL_CHANGE:
+            return await self._submit_building_temporal_policy(session_id, trace, request)
+
         try:
             imagery_out = await self._run_step(
                 trace,
@@ -476,6 +482,108 @@ class QueryController:
         except Exception as exc:
             self._fail_trace(trace, exc)
             raise SatQueryError("analysis_failed", str(exc), status_code=500) from exc
+
+    async def _submit_building_temporal_policy(
+        self,
+        session_id: str,
+        trace: list[TraceStep],
+        request: QueryRequest,
+    ) -> AnalysisResult:
+        try:
+            resolution = await self._run_imagery_policy_step(trace, request)
+            report = resolution.report
+            self._store.update_trace(session_id, trace)
+            if report.policy_decision == PolicyDecision.UNSUPPORTED:
+                raise SatQueryError(
+                    "imagery_policy_unsupported",
+                    report.reason_message
+                    or "Imagery policy does not support building-instance temporal analysis.",
+                    status_code=422,
+                )
+            answer = self._answer.compose_building_temporal_policy(request, report)
+            result = AnalysisResult(
+                status=AnalysisStatus.COMPLETED,
+                session_id=session_id,
+                answer=answer,
+                confidence=0.0,
+                confidence_available=False,
+                metrics=[],
+                evidence=[],
+                trace=trace,
+                mode=DataMode.DEVELOPMENT,
+                imagery_policy=report,
+            )
+            self._store.complete(session_id, result)
+            return result
+        except SatQueryError:
+            raise
+        except Exception as exc:
+            self._fail_trace(trace, exc)
+            raise SatQueryError("analysis_failed", str(exc), status_code=500) from exc
+
+    async def _run_imagery_policy_step(
+        self,
+        trace: list[TraceStep],
+        request: QueryRequest,
+    ) -> TemporalImageryResolution:
+        step_id = f"imagery_policy-{len(trace) + 1}"
+        started = datetime.now(UTC)
+        t0 = perf_counter()
+        step = TraceStep(
+            id=step_id,
+            tool_name="imagery_policy",
+            status=TraceStatus.RUNNING,
+            started_at=started,
+            summary="Evaluating imagery suitability for building-instance temporal analysis…",
+        )
+        trace.append(step)
+        await asyncio.sleep(0)
+
+        resolution = self._imagery_resolver.resolve_catalog(
+            request.aoi,
+            request.earlier_date,
+            request.later_date,
+            ImageryProductMode.BUILDING_INSTANCE,
+        )
+        report = resolution.report
+        elapsed = int((perf_counter() - t0) * 1000)
+        step.status = TraceStatus.COMPLETED
+        step.completed_at = datetime.now(UTC)
+        step.duration_ms = elapsed
+        step.summary = (
+            f"policy={report.policy_decision.value}"
+            + (f" reason={report.reason_code}" if report.reason_code else "")
+        )
+        step.metadata = {
+            "requested_mode": ImageryProductMode.BUILDING_INSTANCE.value,
+            "t1_sensor": report.earlier.sensor.value if report.earlier else None,
+            "t2_sensor": report.later.sensor.value if report.later else None,
+            "t1_gsd_m": report.earlier.gsd_m if report.earlier else None,
+            "t2_gsd_m": report.later.gsd_m if report.later else None,
+            "t1_requested_date": (
+                report.earlier.requested_date.isoformat() if report.earlier else None
+            ),
+            "t2_requested_date": (
+                report.later.requested_date.isoformat() if report.later else None
+            ),
+            "t1_actual_acquisition_date": (
+                report.earlier.actual_acquisition_date.isoformat()
+                if report.earlier and report.earlier.actual_acquisition_date
+                else None
+            ),
+            "t2_actual_acquisition_date": (
+                report.later.actual_acquisition_date.isoformat()
+                if report.later and report.later.actual_acquisition_date
+                else None
+            ),
+            "policy_decision": report.policy_decision.value,
+            "reason_code": report.reason_code,
+            "gsd_mismatch_ratio": report.gsd_mismatch_ratio,
+            "warnings": report.warnings,
+            "status": TraceStatus.COMPLETED.value,
+            "duration_ms": elapsed,
+        }
+        return resolution
 
     def get_trace(self, session_id: str) -> list[TraceStep]:
         session = self._store.get(session_id)

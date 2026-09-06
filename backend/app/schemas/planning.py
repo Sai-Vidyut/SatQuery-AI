@@ -12,6 +12,7 @@ PLANNER_VERSION = "1.0.0"
 class QueryIntent(str, Enum):
     SPECTRAL_CHANGE = "spectral_change"
     CONSTRUCTION = "construction"
+    BUILDING_TEMPORAL_CHANGE = "building_temporal_change"
     RADAR_CHANGE = "radar_change"
     MULTIMODAL_COMPARISON = "multimodal_comparison"
     SINGLE_IMAGE_VQA = "single_image_vqa"
@@ -27,6 +28,7 @@ class RequestedModality(str, Enum):
 
 
 class PlannerToolName(str, Enum):
+    IMAGERY_POLICY = "imagery_policy"
     FETCH_IMAGERY = "fetch_imagery"
     DETECT_CHANGE = "detect_change"
     ANALYZE_SEMANTICS = "analyze_semantics"
@@ -158,6 +160,18 @@ class QueryAnalysisPlan(BaseModel):
                 raise ValueError("cross_modal_optical_sar must not include catalog temporal dates")
             if self.aoi_required:
                 raise ValueError("cross_modal_optical_sar must set aoi_required=False")
+            return self
+
+        if self.user_intent == QueryIntent.BUILDING_TEMPORAL_CHANGE:
+            expected = {PlannerToolName.IMAGERY_POLICY}
+            if tools != expected:
+                raise ValueError("building_temporal_change requires imagery_policy only")
+            if self.earlier_date is None or self.later_date is None:
+                raise ValueError("building_temporal_change requires earlier_date and later_date")
+            if self.later_date <= self.earlier_date:
+                raise ValueError("later_date must be after earlier_date")
+            if not self.aoi_required:
+                raise ValueError("building_temporal_change must set aoi_required=True")
             return self
 
         if self.earlier_date is None or self.later_date is None:

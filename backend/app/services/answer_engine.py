@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.schemas.bi_temporal_change import BiTemporalChangeResult
 from app.schemas.cross_modal import CrossModalOpticalSARResult
 from app.schemas.domain import DataMode, GenerateEvidenceOutput, QueryRequest, SensorType
+from app.schemas.imagery_policy import ImageryPolicyReport, PolicyDecision
 from app.schemas.vqa import SingleImageCaptionResult, SingleImageVQAResult, VQAProviderKind
 from app.services.query_profiles import BUILDING_CONSTRUCTION_PROFILE
 
@@ -198,3 +199,39 @@ class AnswerEngine:
     def compose_cross_modal(self, request: QueryRequest, result: CrossModalOpticalSARResult) -> str:
         mode_note = " [development cross-modal pipeline — not Earth Engine catalog fusion]"
         return f"{result.fused_analysis.summary.strip()}{mode_note}"
+
+    def compose_building_temporal_policy(
+        self,
+        request: QueryRequest,
+        report: ImageryPolicyReport,
+    ) -> str:
+        if report.policy_decision != PolicyDecision.SUPPORTED:
+            return (
+                report.reason_message
+                or "Imagery policy does not support building-instance temporal analysis."
+            )
+
+        earlier = report.earlier
+        later = report.later
+        t1 = (
+            f"T1 {earlier.sensor.value} ({earlier.gsd_m:g} m GSD)"
+            if earlier
+            else "T1 unknown"
+        )
+        t2 = (
+            f"T2 {later.sensor.value} ({later.gsd_m:g} m GSD)"
+            if later
+            else "T2 unknown"
+        )
+        mismatch = (
+            f"; resolution ratio {report.gsd_mismatch_ratio:.1f}×"
+            if report.gsd_mismatch_ratio is not None
+            else ""
+        )
+        return (
+            f"Imagery policy supports building-instance temporal analysis for "
+            f"{request.earlier_date.isoformat()} to {request.later_date.isoformat()} "
+            f"({t1}, {t2}{mismatch}). "
+            "Individual building segmentation and temporal matching are not yet implemented "
+            "(Phase 5B); no building footprints or instance-level claims are produced."
+        )
