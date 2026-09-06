@@ -44,9 +44,13 @@ See `evaluation/cases/catalog_cases.json` — five qualitative catalog cases ali
 
 ## False-positive modes (documented, not auto-suppressed)
 
-- Vegetation seasonality / harvest cycles (deforestation, mining)
+- Vegetation seasonality / harvest cycles (deforestation, mining) — **Phase 7:** NDVI index path + cross-season warnings
 - Cloud/shadow contamination (all optical)
-- Water seasonality (water shrinkage)
+- Water seasonality (water shrinkage) — **Phase 7:** NDWI index path + cross-season warnings
 - Bare soil ↔ mining ambiguity (mining)
 - Built-up ↔ infrastructure ambiguity (infrastructure)
 - Registration differences between anchor scenes (all catalog CVA)
+
+## Phase 7 seasonality fixtures
+
+See `evaluation/cases/seasonality_cases.json` and `evaluation/PHASE7_REPORT.md`.

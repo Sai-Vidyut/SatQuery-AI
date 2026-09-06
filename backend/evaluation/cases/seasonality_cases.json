@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "description": "Phase 7 seasonality false-positive evaluation fixtures. Synthetic expectations only — no live EE required for unit tests.",
+  "cases": [
+    {
+      "case_id": "fp_vegetation_seasonality",
+      "domain": "deforestation",
+      "scenario": "vegetation_seasonality_no_loss",
+      "description": "Same-month pair with phenology shift but no persistent forest loss.",
+      "earlier_date": "2020-06-01",
+      "later_date": "2020-06-15",
+      "expected_direction_hint": "no_change",
+      "expected_method": "index_differencing",
+      "expected_primary_index": "ndvi",
+      "notes": "Index differencing with small median delta should not claim vegetation_loss."
+    },
+    {
+      "case_id": "fp_water_seasonality",
+      "domain": "water_shrinkage",
+      "scenario": "water_seasonality_no_shrinkage",
+      "description": "Seasonal inflow variation without permanent shoreline retreat.",
+      "earlier_date": "2018-06-01",
+      "later_date": "2018-06-20",
+      "expected_direction_hint": "no_change",
+      "expected_method": "index_differencing",
+      "expected_primary_index": "ndwi",
+      "notes": "NDWI path should not claim water_contraction on sub-threshold seasonal variation."
+    },
+    {
+      "case_id": "tp_genuine_vegetation_loss",
+      "domain": "deforestation",
+      "scenario": "genuine_vegetation_loss",
+      "description": "Persistent forest clearing with sustained NDVI decrease.",
+      "earlier_date": "2019-08-01",
+      "later_date": "2023-08-01",
+      "expected_direction_hint": "vegetation_loss",
+      "expected_method": "index_differencing",
+      "expected_primary_index": "ndvi",
+      "notes": "Same-month multi-year pair; large negative NDVI delta expected."
+    },
+    {
+      "case_id": "tp_genuine_water_shrinkage",
+      "domain": "water_shrinkage",
+      "scenario": "genuine_water_shrinkage",
+      "description": "Documented drought-period shoreline retreat.",
+      "earlier_date": "2016-06-01",
+      "later_date": "2022-06-01",
+      "expected_direction_hint": "water_contraction",
+      "expected_method": "index_differencing",
+      "expected_primary_index": "ndwi",
+      "notes": "Lake Mead-style same-month multi-year comparison."
+    },
+    {
+      "case_id": "stable_urban_area",
+      "domain": "urban_expansion",
+      "scenario": "unchanged_urban_area",
+      "description": "Stable built environment with no significant NDBI shift.",
+      "earlier_date": "2020-01-01",
+      "later_date": "2020-01-15",
+      "expected_direction_hint": "no_change",
+      "expected_method": "index_differencing",
+      "expected_primary_index": "ndbi",
+      "notes": "Short-interval urban stability should not produce built_up_increase."
+    },
+    {
+      "case_id": "cross_season_warning",
+      "domain": "deforestation",
+      "scenario": "cross_season_comparison",
+      "description": "January vs September comparison should surface seasonality warning.",
+      "earlier_date": "2020-01-01",
+      "later_date": "2020-09-01",
+      "expected_cross_season_warning": true,
+      "expected_method": "index_differencing",
+      "expected_primary_index": "ndvi",
+      "notes": "Warning only — user dates are not silently changed."
+    }
+  ]
+}

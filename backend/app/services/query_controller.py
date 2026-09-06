@@ -445,7 +445,7 @@ class QueryController:
             detections = await self._run_step(
                 trace,
                 "detect_change",
-                self._detect_change(request, imagery_out),
+                self._detect_change(request, imagery_out, plan),
             )
             semantic_out = await self._run_semantics_step(
                 trace,
@@ -1526,6 +1526,7 @@ class QueryController:
                     for scene in result.scenes
                 ],
                 "selection_policy": (result.provider_metadata or {}).get("selection_policy"),
+                "seasonality": (result.provider_metadata or {}).get("seasonality"),
             }
         if tool_name == "detect_change":
             metadata = output.detector_metadata or {}
@@ -1537,6 +1538,9 @@ class QueryController:
                 "detector_version": metadata.get("detector_version"),
                 "method": metadata.get("method"),
                 "threshold": metadata.get("threshold"),
+                "primary_index": metadata.get("primary_index"),
+                "change_direction_hint": metadata.get("change_direction_hint"),
+                "seasonality_warnings": metadata.get("seasonality_warnings"),
             }
         return None
 
@@ -1556,12 +1560,14 @@ class QueryController:
         )
         return await self._fetch.execute(FetchImageryInput(request=imagery_request))
 
-    async def _detect_change(self, request: QueryRequest, fetch_output):
+    async def _detect_change(self, request: QueryRequest, fetch_output, plan: QueryAnalysisPlan):
         payload = ChangeDetectionInput(
             aoi=request.aoi,
             earlier_date=request.earlier_date,
             later_date=request.later_date,
             imagery=fetch_output.result,
+            query_hint=request.query,
+            change_domain=plan.change_domain.value if plan.change_domain else None,
         )
         return await self._detect.execute(payload)
 

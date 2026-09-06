@@ -256,6 +256,10 @@ class ChangeDetectionInput(BaseModel):
         default=None,
         description="Optional natural-language hint for index selection on uploaded pairs.",
     )
+    change_domain: str | None = Field(
+        default=None,
+        description="Phase 5B/7 change domain for catalog index routing (earth_engine path).",
+    )
 
 
 class ChangeDetectionOutput(BaseModel):

@@ -77,7 +77,7 @@ async def test_earth_engine_provider_returns_real_metadata(mock_ee_client):
     assert result.collection_id == "COPERNICUS/S2_SR_HARMONIZED"
     assert len(result.scenes) == 2
     assert result.scenes[0].platform_id.startswith("COPERNICUS/S2_SR_HARMONIZED/")
-    assert result.provider_metadata["selection_policy"] == "1.0.0"
+    assert result.provider_metadata["selection_policy"] == "1.1.0"
     assert result.message is None
 
 

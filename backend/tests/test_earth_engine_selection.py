@@ -44,6 +44,16 @@ def test_select_anchor_scenes_empty_raises():
     assert exc.value.code == "no_imagery_after_cloud_filter"
 
 
+def test_select_anchor_scenes_prefers_same_season_over_closer_cross_season():
+    """Policy v1.1.0: same-month scene wins over slightly closer cross-season scene."""
+    candidates = [
+        _scene("jan", date(2024, 1, 8), 5.0),
+        _scene("jun", date(2024, 6, 12), 5.0),
+    ]
+    selected = select_anchor_scenes(candidates, date(2024, 6, 10), date(2024, 6, 10))
+    assert selected[0].scene_id == "jun"
+
+
 def test_selection_is_deterministic():
     candidates = [
         _scene("z", date(2024, 1, 15), 8.0),

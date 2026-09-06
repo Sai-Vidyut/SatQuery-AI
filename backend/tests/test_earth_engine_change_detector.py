@@ -92,7 +92,10 @@ async def test_ee_change_detector_returns_earth_engine_output(mock_client):
 
     with patch(
         "app.adapters.change.earth_engine.detector.run_cva_detection",
-        return_value=MOCK_FEATURES,
+        return_value=(
+            MOCK_FEATURES,
+            {"method": "change_vector_analysis", "threshold": 1000.0, "primary_index": None},
+        ),
     ):
         output = await detector.detect(payload)
 
@@ -118,7 +121,10 @@ async def test_ee_change_detector_no_change_returns_empty_regions(mock_client):
 
     with patch(
         "app.adapters.change.earth_engine.detector.run_cva_detection",
-        return_value=[],
+        return_value=(
+            [],
+            {"method": "change_vector_analysis", "threshold": 1000.0, "primary_index": None},
+        ),
     ):
         output = await detector.detect(payload)
 

@@ -14,12 +14,13 @@ from app.adapters.imagery.earth_engine.constants import (
     SENTINEL2_SR_COLLECTION,
 )
 from app.adapters.imagery.earth_engine.geometry import bbox_from_geometry, geojson_to_ee_geometry
-from app.adapters.imagery.earth_engine.selection import select_anchor_scenes
+from app.adapters.imagery.earth_engine.seasonality import build_seasonality_provenance
 from app.adapters.imagery.earth_engine.sentinel1 import (
     query_sentinel1_scenes,
     scene_has_polarizations,
     select_s1_anchor_scenes,
 )
+from app.adapters.imagery.earth_engine.selection import select_anchor_scenes
 from app.adapters.imagery.earth_engine.sentinel2 import SceneCandidate, query_sentinel2_scenes
 from app.core.errors import SatQueryError
 from app.schemas.domain import (
@@ -90,6 +91,12 @@ class EarthEngineProvider(ImageryProvider):
         )
 
         scenes = [_candidate_to_scene(c) for c in selected]
+        seasonality = build_seasonality_provenance(
+            requested_start=request.start_date,
+            requested_end=request.end_date,
+            selected_dates=[s.acquisition_date for s in scenes],
+            selection_policy=SELECTION_POLICY_VERSION,
+        )
 
         return ImageryResult(
             source="google-earth-engine",
@@ -105,6 +112,7 @@ class EarthEngineProvider(ImageryProvider):
                 "candidate_count": len(candidates),
                 "selected_count": len(scenes),
                 "cloud_cover_max": request.preferences.cloud_cover_max,
+                "seasonality": seasonality,
             },
             message=None,
         )
