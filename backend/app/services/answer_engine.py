@@ -55,7 +55,7 @@ class AnswerEngine:
 
         pct = round(evidence.confidence * 100)
         mode_note = (
-            " (development demo data)"
+            " [DEMONSTRATION DATA — not real Earth observation]"
             if mode == DataMode.DEVELOPMENT
             else ""
         )
@@ -77,7 +77,7 @@ class AnswerEngine:
                 f"\"{request.query.strip()}\" between {request.earlier_date.isoformat()} and "
                 f"{request.later_date.isoformat()}. "
                 f"This is radar change evidence only — not flood, construction, or damage confirmation. "
-                f"Mean confidence {pct}%.{mode_note}"
+                f"Mean detector separability {pct}% (not event probability).{mode_note}"
             )
 
         if analysis_profile == BUILDING_CONSTRUCTION_PROFILE and candidate_count > 0:
@@ -100,7 +100,7 @@ class AnswerEngine:
                 f"{sar_clause} "
                 f"Query: \"{request.query.strip()}\" between "
                 f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}. "
-                f"Mean confidence {pct}%.{mode_note}"
+                f"Mean detector separability {pct}% (not event probability).{mode_note}"
             )
 
         if multimodal_count > 0:
@@ -111,7 +111,7 @@ class AnswerEngine:
                 f"for your query \"{request.query.strip()}\" between "
                 f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}. "
                 f"No semantic construction claims were made from SAR alone. "
-                f"Mean confidence {pct}%.{mode_note}"
+                f"Mean detector separability {pct}% (not event probability).{mode_note}"
             )
 
         if analysis_profile == BUILDING_CONSTRUCTION_PROFILE:
@@ -120,14 +120,15 @@ class AnswerEngine:
                 f"for your query \"{request.query.strip()}\" between "
                 f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}. "
                 f"No construction candidates were supported by semantic built-area evidence. "
-                f"Mean confidence {pct}%.{mode_note}"
+                f"Mean detector separability {pct}% (not event probability).{mode_note}"
             )
 
         return (
             f"Found {cva_count or total} significant spectral change region"
             f"{'s' if (cva_count or total) != 1 else ''} matching your query "
             f"\"{request.query.strip()}\" between {request.earlier_date.isoformat()} and "
-            f"{request.later_date.isoformat()}. Mean confidence {pct}%.{mode_note}"
+            f"{request.later_date.isoformat()}. Mean detector separability {pct}% "
+            f"(not event probability).{mode_note}"
         )
 
     def compose_vqa(self, request: QueryRequest, vqa: SingleImageVQAResult) -> str:
@@ -225,6 +226,7 @@ class AnswerEngine:
                     strength=strength,
                     direction_hint=change.detector_summary.change_direction_hint,
                     primary_index=change.detector_summary.primary_index,
+                    region_count=change.changed_region_count,
                 )
             )
             parts.append(domain_limitation(change_domain))
@@ -272,7 +274,11 @@ class AnswerEngine:
             )
 
         pct = round(evidence.confidence * 100)
-        mode_note = " (development demo data)" if mode == DataMode.DEVELOPMENT else ""
+        mode_note = (
+            " [DEMONSTRATION DATA — not real Earth observation]"
+            if mode == DataMode.DEVELOPMENT
+            else ""
+        )
         area_ha = detector_meta.get("area_ha")
         changed_pct = detector_meta.get("changed_percentage")
         area_part = ""
@@ -287,6 +293,8 @@ class AnswerEngine:
             strength=strength,
             direction_hint=direction_hint,
             primary_index=primary_index,
+            region_count=len(evidence.regions),
+            candidate_count=len(domain_regions),
         )
         region_part = (
             f"{len(domain_regions)} domain candidate region{'s' if len(domain_regions) != 1 else ''} "
@@ -294,7 +302,21 @@ class AnswerEngine:
             f"{'s' if spectral_count != 1 else ''} mapped between "
             f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}."
         )
-        confidence_note = f"Mean detector confidence {pct}%."
+        if len(evidence.regions) == 0:
+            region_part = (
+                f"No mapped change regions between "
+                f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}."
+            )
+        elif spectral_count == 0 and len(evidence.regions) > 0:
+            region_part = (
+                f"{len(evidence.regions)} mapped region"
+                f"{'s' if len(evidence.regions) != 1 else ''} between "
+                f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}."
+            )
+
+        confidence_note = (
+            f"Mean detector separability {pct}% (histogram separability, not event probability)."
+        )
         return (
             f"{area_part}{domain_clause} {region_part} {confidence_note} "
             f"{domain_limitation(change_domain)}{mode_note}"

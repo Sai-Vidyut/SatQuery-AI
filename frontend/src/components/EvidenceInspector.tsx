@@ -1,9 +1,93 @@
 "use client";
 
-import type { AnalysisResult, EvidenceRegion } from "@/types/domain";
+import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { claimTypeLabel } from "@/lib/geo";
+import { isFetchImageryMetadata } from "@/lib/trace";
 import { ExecutionTrace } from "./ExecutionTrace";
+
+function catalogProvenanceFromTrace(trace: TraceStep[]) {
+  const fetch = trace.find((s) => s.tool_name === "fetch_imagery");
+  const detect = trace.find((s) => s.tool_name === "detect_change");
+  const plan = trace.find((s) => s.tool_name === "plan_query");
+  const fetchMeta =
+    fetch?.metadata && isFetchImageryMetadata(fetch.metadata)
+      ? (fetch.metadata as FetchImageryMetadata)
+      : null;
+  const detectMeta = (detect?.metadata ?? {}) as Record<string, unknown>;
+  const planMeta = (plan?.metadata ?? {}) as Record<string, unknown>;
+  return { fetchMeta, detectMeta, planMeta };
+}
+
+function CatalogProvenance({ result }: { result: AnalysisResult }) {
+  const { fetchMeta, detectMeta, planMeta } = catalogProvenanceFromTrace(result.trace);
+  if (!fetchMeta && !detectMeta.change_direction_hint && !planMeta.change_domain) {
+    return null;
+  }
+  return (
+    <div className="inspector-bitemporal-meta" data-testid="inspector-catalog-provenance">
+      <p className="inspector-section__label" style={{ marginTop: 12 }}>
+        Data provenance
+      </p>
+      <dl className="m-0">
+        {fetchMeta?.t1?.requested_date ? (
+          <div className="inspector-metric-row">
+            <dt>Requested T1 / T2</dt>
+            <dd>
+              {fetchMeta.t1.requested_date} / {fetchMeta.t2?.requested_date ?? "?"}
+            </dd>
+          </div>
+        ) : null}
+        {fetchMeta?.imagery_strategy ? (
+          <div className="inspector-metric-row">
+            <dt>Imagery strategy</dt>
+            <dd>{fetchMeta.imagery_strategy}</dd>
+          </div>
+        ) : null}
+        {typeof detectMeta.detector === "string" ? (
+          <div className="inspector-metric-row">
+            <dt>Detector</dt>
+            <dd>{detectMeta.detector}</dd>
+          </div>
+        ) : null}
+        {typeof detectMeta.primary_index === "string" ? (
+          <div className="inspector-metric-row">
+            <dt>Primary signal</dt>
+            <dd>{String(detectMeta.primary_index).toUpperCase()}</dd>
+          </div>
+        ) : null}
+        {typeof detectMeta.change_direction_hint === "string" ? (
+          <div className="inspector-metric-row">
+            <dt>Direction hint</dt>
+            <dd>{detectMeta.change_direction_hint.replace(/_/g, " ")}</dd>
+          </div>
+        ) : null}
+        {typeof planMeta.change_domain === "string" ? (
+          <div className="inspector-metric-row">
+            <dt>Domain</dt>
+            <dd>{planMeta.change_domain.replace(/_/g, " ")}</dd>
+          </div>
+        ) : null}
+        {detectMeta.area_ha != null ? (
+          <div className="inspector-metric-row">
+            <dt>Changed area</dt>
+            <dd>{String(detectMeta.area_ha)} ha</dd>
+          </div>
+        ) : null}
+        <div className="inspector-metric-row">
+          <dt>Confidence type</dt>
+          <dd>{String(detectMeta.confidence_kind ?? "histogram_separability").replace(/_/g, " ")}</dd>
+        </div>
+      </dl>
+      {fetchMeta?.fallback_events?.length ? (
+        <p className="inspector-note inspector-note--warning mt-2">
+          Imagery fallback applied:{" "}
+          {fetchMeta.fallback_events.map((e) => String(e.policy_decision ?? "fallback")).join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 type Props = {
   result: AnalysisResult | null;
@@ -72,6 +156,15 @@ export function EvidenceInspector({
 
       {result ? (
         <div className="inspector-section">
+          {result.demonstration_data ? (
+            <p
+              className="inspector-note inspector-note--warning mb-2"
+              data-testid="inspector-demo-banner"
+              role="status"
+            >
+              DEMONSTRATION DATA — deterministic fixtures, not real Earth observation.
+            </p>
+          ) : null}
           <p className="inspector-section__label">Answer</p>
           <p className="inspector-answer">{result.answer}</p>
           {isPartialSemantic ? (
@@ -83,6 +176,9 @@ export function EvidenceInspector({
             <p className="inspector-note">
               No significant change in this AOI for the selected dates. Widen the date range or AOI.
             </p>
+          ) : null}
+          {!result.vqa && !result.caption && !result.bi_temporal_change && !result.cross_modal ? (
+            <CatalogProvenance result={result} />
           ) : null}
           {result.cross_modal ? (
             <div className="inspector-crossmodal-meta" data-testid="inspector-crossmodal-provenance">

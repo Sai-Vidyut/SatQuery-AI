@@ -36,6 +36,8 @@ type Props = {
   onQueryChange: (v: string) => void;
   onRun: () => void;
   onBboxSubmit: (bbox: string) => void;
+  demoMode: boolean;
+  onDemoModeChange: (enabled: boolean) => void;
 };
 
 export function QueryComposer({
@@ -69,6 +71,8 @@ export function QueryComposer({
   onQueryChange,
   onRun,
   onBboxSubmit,
+  demoMode,
+  onDemoModeChange,
 }: Props) {
   const [showBbox, setShowBbox] = useState(false);
   const [bboxText, setBboxText] = useState("");
@@ -363,6 +367,20 @@ export function QueryComposer({
                   onChange={(e) => onLaterChange(e.target.value)}
                   required
                 />
+              </div>
+              <div className="composer-segment">
+                <label className="composer-label flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    data-testid="composer-demo-mode"
+                    checked={demoMode}
+                    onChange={(e) => onDemoModeChange(e.target.checked)}
+                  />
+                  Demo mode
+                </label>
+                <p className="composer-upload-status m-0">
+                  Uses DEMONSTRATION DATA (no live Earth Engine).
+                </p>
               </div>
             </>
           ) : null}

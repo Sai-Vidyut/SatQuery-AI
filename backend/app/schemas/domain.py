@@ -71,6 +71,10 @@ class ImageryRequest(BaseModel):
     end_date: date
     sensor: SensorType = SensorType.SENTINEL_2
     preferences: ImageryPreferences = Field(default_factory=ImageryPreferences)
+    demo_mode: bool = Field(
+        default=False,
+        description="When true, force deterministic demonstration imagery (no Earth Engine).",
+    )
 
     @model_validator(mode="after")
     def validate_dates(self) -> ImageryRequest:
@@ -146,6 +150,10 @@ class QueryRequest(BaseModel):
     sar_image_id: str | None = Field(
         default=None,
         description="SAR image id for cross-modal analysis.",
+    )
+    demo_mode: bool = Field(
+        default=False,
+        description="Use deterministic demonstration data instead of live Earth Engine catalog.",
     )
 
     @property
@@ -240,6 +248,10 @@ class AnalysisResult(BaseModel):
     evidence: list[EvidenceRegion] = Field(default_factory=list)
     trace: list[TraceStep] = Field(default_factory=list)
     mode: DataMode = DataMode.DEVELOPMENT
+    demonstration_data: bool = Field(
+        default=False,
+        description="True when results use deterministic demonstration fixtures, not live catalog.",
+    )
     vqa: SingleImageVQAResult | None = None
     caption: SingleImageCaptionResult | None = None
     bi_temporal_change: BiTemporalChangeResult | None = None

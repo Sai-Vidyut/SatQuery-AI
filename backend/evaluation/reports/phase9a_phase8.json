@@ -1,0 +1,745 @@
+[
+  {
+    "case_id": "urban_expansion_bengaluru_east",
+    "domain": "urban_expansion",
+    "evaluation_type": "qualitative",
+    "status": "failed",
+    "error_code": "no_imagery_found",
+    "error_message": "No Sentinel-2 scenes in T1 composite window [2018-05-17, 2018-06-16] for anchor 2018-06-01. Try widening the date range or increasing cloud_cover_max.",
+    "imagery_provider": "earth_engine",
+    "data_mode": null,
+    "detector": null,
+    "scenes": [],
+    "planner_intent": null,
+    "change_domain": null,
+    "required_tools": [],
+    "region_count": 0,
+    "candidate_region_count": 0,
+    "changed_area_m2": null,
+    "confidence": null,
+    "answer": null,
+    "answer_mentions_development_mock": false,
+    "step_timings": [],
+    "total_duration_ms": 541343,
+    "detector_metadata": {},
+    "composite_provenance": {},
+    "imagery_strategy": null,
+    "trace_summary": [],
+    "quantitative": null,
+    "qualitative_assessment": {}
+  },
+  {
+    "case_id": "deforestation_amazon_rondonia",
+    "domain": "deforestation",
+    "evaluation_type": "qualitative",
+    "status": "completed",
+    "error_code": null,
+    "error_message": null,
+    "imagery_provider": "earth_engine",
+    "data_mode": "earth_engine",
+    "detector": "earth_engine_cva",
+    "scenes": [
+      {
+        "scene_id": "composite-t1-2019-08-01",
+        "acquisition_date": "2019-08-01",
+        "platform_id": "COMPOSITE/MEDIAN/t1",
+        "cloud_cover_percent": 0.44,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2019-07-17",
+        "window_end": "2019-08-16",
+        "scene_count": 4
+      },
+      {
+        "scene_id": "composite-t2-2023-08-01",
+        "acquisition_date": "2023-08-01",
+        "platform_id": "COMPOSITE/MEDIAN/t2",
+        "cloud_cover_percent": 0.58,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2023-07-17",
+        "window_end": "2023-08-16",
+        "scene_count": 3
+      }
+    ],
+    "planner_intent": "spectral_change",
+    "change_domain": "deforestation",
+    "required_tools": [
+      "fetch_imagery",
+      "detect_change",
+      "fuse_evidence",
+      "generate_evidence"
+    ],
+    "region_count": 9,
+    "candidate_region_count": 9,
+    "changed_area_m2": 906904.0,
+    "confidence": 0.0,
+    "answer": "Spectral change detected; no strong vegetation loss signal alignment was found in the primary index or direction hint. 9 domain candidate regions and 9 spectral change regions mapped between 2019-08-01 and 2023-08-01. Mean detector confidence 0%. This is a spectral-change indication consistent with vegetation loss, not definitive proof of deforestation.",
+    "answer_mentions_development_mock": false,
+    "step_timings": [
+      {
+        "tool_name": "plan_query",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "duration_ms": 119291,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_change",
+        "duration_ms": 8825,
+        "status": "completed"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "duration_ms": 52,
+        "status": "completed"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "duration_ms": 51,
+        "status": "completed"
+      }
+    ],
+    "total_duration_ms": 128222,
+    "detector_metadata": {
+      "detector": "earth_engine_cva",
+      "data_mode": "earth_engine",
+      "raw_detection_count": 9,
+      "region_count": 9,
+      "detector_version": "1.2.0",
+      "method": "index_differencing",
+      "threshold": 0.15,
+      "primary_index": "ndvi",
+      "change_direction_hint": "vegetation_loss",
+      "seasonality_warnings": null
+    },
+    "composite_provenance": {
+      "t1": {
+        "requested_date": "2019-08-01",
+        "window_start": "2019-07-17",
+        "window_end": "2019-08-16",
+        "scene_count": 4,
+        "scene_dates": [
+          "2019-08-01",
+          "2019-08-06",
+          "2019-08-11",
+          "2019-08-16"
+        ]
+      },
+      "t2": {
+        "requested_date": "2023-08-01",
+        "window_start": "2023-07-17",
+        "window_end": "2023-08-16",
+        "scene_count": 3,
+        "scene_dates": [
+          "2023-07-31",
+          "2023-07-26",
+          "2023-07-21"
+        ]
+      },
+      "imagery_strategy": "seasonal_median_composite",
+      "composite_method": "median"
+    },
+    "imagery_strategy": "seasonal_median_composite",
+    "trace_summary": [
+      {
+        "tool_name": "plan_query",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "planner=deterministic intent=spectral_change tools=fetch_imagery,detect_change,fuse_evidence,generate_evidence"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "status": "completed",
+        "duration_ms": 119291,
+        "summary": "Built median composites: T1 4 scenes (2019-07-17\u20132019-08-16), T2 3 scenes (2023-07-17\u20132023-08-16)"
+      },
+      {
+        "tool_name": "detect_change",
+        "status": "completed",
+        "duration_ms": 8825,
+        "summary": "Detected 9 region(s) via earth_engine_cva"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "analyze_semantics skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "detect_sar_change skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "status": "completed",
+        "duration_ms": 52,
+        "summary": "Fused 9 evidence region(s) (1.0.0)"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "status": "completed",
+        "duration_ms": 51,
+        "summary": "Validated 9 evidence region(s)"
+      }
+    ],
+    "quantitative": null,
+    "qualitative_assessment": {
+      "detected_regions": true,
+      "has_domain_candidates": true,
+      "expected_change": "Forest clearing and vegetation loss patches along agricultural frontier.",
+      "reference": "Amazon deforestation monitoring context (INPE PRODES); qualitative only \u2014 seasonality risk in dry-season pair."
+    }
+  },
+  {
+    "case_id": "water_shrinkage_lake_mead",
+    "domain": "water_shrinkage",
+    "evaluation_type": "qualitative",
+    "status": "completed",
+    "error_code": null,
+    "error_message": null,
+    "imagery_provider": "earth_engine",
+    "data_mode": "earth_engine",
+    "detector": "earth_engine_cva",
+    "scenes": [
+      {
+        "scene_id": "composite-t1-2016-06-01",
+        "acquisition_date": "2016-06-01",
+        "platform_id": "COMPOSITE/MEDIAN/t1",
+        "cloud_cover_percent": 0.19,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2016-05-17",
+        "window_end": "2016-06-16",
+        "scene_count": 4
+      },
+      {
+        "scene_id": "composite-t2-2022-06-01",
+        "acquisition_date": "2022-06-01",
+        "platform_id": "COMPOSITE/MEDIAN/t2",
+        "cloud_cover_percent": 0.84,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2022-05-17",
+        "window_end": "2022-06-16",
+        "scene_count": 6
+      }
+    ],
+    "planner_intent": "spectral_change",
+    "change_domain": "water_shrinkage",
+    "required_tools": [
+      "fetch_imagery",
+      "detect_change",
+      "fuse_evidence",
+      "generate_evidence"
+    ],
+    "region_count": 6,
+    "candidate_region_count": 6,
+    "changed_area_m2": 897134.0,
+    "confidence": 0.0,
+    "answer": "Spectral change detected; no strong water shrinkage signal alignment was found in the primary index or direction hint. 6 domain candidate regions and 6 spectral change regions mapped between 2016-06-01 and 2022-06-01. Mean detector confidence 0%. This is a water-index / spectral indication, not confirmed hydrological survey data.",
+    "answer_mentions_development_mock": false,
+    "step_timings": [
+      {
+        "tool_name": "plan_query",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "duration_ms": 969513,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_change",
+        "duration_ms": 12908,
+        "status": "completed"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "duration_ms": 52,
+        "status": "completed"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "duration_ms": 55,
+        "status": "completed"
+      }
+    ],
+    "total_duration_ms": 982530,
+    "detector_metadata": {
+      "detector": "earth_engine_cva",
+      "data_mode": "earth_engine",
+      "raw_detection_count": 6,
+      "region_count": 6,
+      "detector_version": "1.2.0",
+      "method": "index_differencing",
+      "threshold": 0.12,
+      "primary_index": "ndwi",
+      "change_direction_hint": "water_expansion",
+      "seasonality_warnings": null
+    },
+    "composite_provenance": {
+      "t1": {
+        "requested_date": "2016-06-01",
+        "window_start": "2016-05-17",
+        "window_end": "2016-06-16",
+        "scene_count": 4,
+        "scene_dates": [
+          "2016-06-05",
+          "2016-06-05",
+          "2016-06-15",
+          "2016-06-15"
+        ]
+      },
+      "t2": {
+        "requested_date": "2022-06-01",
+        "window_start": "2022-05-17",
+        "window_end": "2022-06-16",
+        "scene_count": 6,
+        "scene_dates": [
+          "2022-05-30",
+          "2022-05-30",
+          "2022-05-25",
+          "2022-05-25",
+          "2022-05-20",
+          "2022-05-20"
+        ]
+      },
+      "imagery_strategy": "seasonal_median_composite",
+      "composite_method": "median"
+    },
+    "imagery_strategy": "seasonal_median_composite",
+    "trace_summary": [
+      {
+        "tool_name": "plan_query",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "planner=deterministic intent=spectral_change tools=fetch_imagery,detect_change,fuse_evidence,generate_evidence"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "status": "completed",
+        "duration_ms": 969513,
+        "summary": "Built median composites: T1 4 scenes (2016-05-17\u20132016-06-16), T2 6 scenes (2022-05-17\u20132022-06-16)"
+      },
+      {
+        "tool_name": "detect_change",
+        "status": "completed",
+        "duration_ms": 12908,
+        "summary": "Detected 6 region(s) via earth_engine_cva"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "analyze_semantics skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "detect_sar_change skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "status": "completed",
+        "duration_ms": 52,
+        "summary": "Fused 6 evidence region(s) (1.0.0)"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "status": "completed",
+        "duration_ms": 55,
+        "summary": "Validated 6 evidence region(s)"
+      }
+    ],
+    "quantitative": null,
+    "qualitative_assessment": {
+      "detected_regions": true,
+      "has_domain_candidates": true,
+      "expected_change": "Reduced open-water extent along Lake Mead shoreline (documented drought period).",
+      "reference": "US Bureau of Reclamation Lake Mead bathymetry/elevation records; qualitative shoreline change."
+    }
+  },
+  {
+    "case_id": "infrastructure_dubai_south",
+    "domain": "infrastructure_development",
+    "evaluation_type": "qualitative",
+    "status": "completed",
+    "error_code": null,
+    "error_message": null,
+    "imagery_provider": "earth_engine",
+    "data_mode": "earth_engine",
+    "detector": "earth_engine_cva",
+    "scenes": [
+      {
+        "scene_id": "composite-t1-2018-01-01",
+        "acquisition_date": "2018-01-01",
+        "platform_id": "COMPOSITE/MEDIAN/t1",
+        "cloud_cover_percent": 2.56,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2017-12-17",
+        "window_end": "2018-01-16",
+        "scene_count": 2
+      },
+      {
+        "scene_id": "composite-t2-2024-01-01",
+        "acquisition_date": "2024-01-01",
+        "platform_id": "COMPOSITE/MEDIAN/t2",
+        "cloud_cover_percent": 15.21,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2023-12-17",
+        "window_end": "2024-01-16",
+        "scene_count": 1
+      }
+    ],
+    "planner_intent": "construction",
+    "change_domain": "infrastructure_development",
+    "required_tools": [
+      "fetch_imagery",
+      "detect_change",
+      "analyze_semantics",
+      "fuse_evidence",
+      "generate_evidence"
+    ],
+    "region_count": 8,
+    "candidate_region_count": 8,
+    "changed_area_m2": 1765975.0,
+    "confidence": 0.0,
+    "answer": "Spectral change detected; no strong infrastructure development signal alignment was found in the primary index or direction hint. 8 domain candidate regions and 8 spectral change regions mapped between 2018-01-01 and 2024-01-01. Mean detector confidence 0%. This is a built-signal / spectral indication, not confirmed infrastructure asset mapping.",
+    "answer_mentions_development_mock": false,
+    "step_timings": [
+      {
+        "tool_name": "plan_query",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "duration_ms": 389101,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_change",
+        "duration_ms": 15088,
+        "status": "completed"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "duration_ms": 22994,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "duration_ms": 51,
+        "status": "completed"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "duration_ms": 51,
+        "status": "completed"
+      }
+    ],
+    "total_duration_ms": 427288,
+    "detector_metadata": {
+      "detector": "earth_engine_cva",
+      "data_mode": "earth_engine",
+      "raw_detection_count": 8,
+      "region_count": 8,
+      "detector_version": "1.2.0",
+      "method": "index_differencing",
+      "threshold": 0.12,
+      "primary_index": "ndbi",
+      "change_direction_hint": "built_up_decrease",
+      "seasonality_warnings": [
+        "t2_low_scene_count: only 1 scene(s) in composite window; preferred minimum is 2."
+      ]
+    },
+    "composite_provenance": {
+      "t1": {
+        "requested_date": "2018-01-01",
+        "window_start": "2017-12-17",
+        "window_end": "2018-01-16",
+        "scene_count": 2,
+        "scene_dates": [
+          "2018-01-09",
+          "2018-01-14"
+        ]
+      },
+      "t2": {
+        "requested_date": "2024-01-01",
+        "window_start": "2023-12-17",
+        "window_end": "2024-01-16",
+        "scene_count": 1,
+        "scene_dates": [
+          "2023-12-19"
+        ]
+      },
+      "imagery_strategy": "seasonal_median_composite",
+      "composite_method": "median"
+    },
+    "imagery_strategy": "seasonal_median_composite",
+    "trace_summary": [
+      {
+        "tool_name": "plan_query",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "planner=deterministic intent=construction tools=fetch_imagery,detect_change,analyze_semantics,fuse_evidence,generate_evidence"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "status": "completed",
+        "duration_ms": 389101,
+        "summary": "Built median composites: T1 2 scenes (2017-12-17\u20132018-01-16), T2 1 scenes (2023-12-17\u20132024-01-16)"
+      },
+      {
+        "tool_name": "detect_change",
+        "status": "completed",
+        "duration_ms": 15088,
+        "summary": "Detected 8 region(s) via earth_engine_cva"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "status": "completed",
+        "duration_ms": 22994,
+        "summary": "Produced 0 semantic region(s) via dynamic_world_built_v1"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "detect_sar_change skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "status": "completed",
+        "duration_ms": 51,
+        "summary": "Fused 8 evidence region(s) (1.0.0)"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "status": "completed",
+        "duration_ms": 51,
+        "summary": "Validated 8 evidence region(s)"
+      }
+    ],
+    "quantitative": null,
+    "qualitative_assessment": {
+      "detected_regions": true,
+      "has_domain_candidates": true,
+      "expected_change": "New transport and built infrastructure in Dubai south / Expo corridor.",
+      "reference": "Documented infrastructure expansion in Dubai south; system reports built/spectral candidates only."
+    }
+  },
+  {
+    "case_id": "mining_disturbance_eu_reference",
+    "domain": "mining",
+    "evaluation_type": "qualitative",
+    "status": "completed",
+    "error_code": null,
+    "error_message": null,
+    "imagery_provider": "earth_engine",
+    "data_mode": "earth_engine",
+    "detector": "earth_engine_cva",
+    "scenes": [
+      {
+        "scene_id": "composite-t1-2017-06-01",
+        "acquisition_date": "2017-06-01",
+        "platform_id": "COMPOSITE/MEDIAN/t1",
+        "cloud_cover_percent": 29.49,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2017-05-17",
+        "window_end": "2017-06-16",
+        "scene_count": 1
+      },
+      {
+        "scene_id": "composite-t2-2023-06-01",
+        "acquisition_date": "2023-06-01",
+        "platform_id": "COMPOSITE/MEDIAN/t2",
+        "cloud_cover_percent": 7.36,
+        "imagery_strategy": "seasonal_median_composite",
+        "composite_method": "median",
+        "window_start": "2023-05-17",
+        "window_end": "2023-06-16",
+        "scene_count": 4
+      }
+    ],
+    "planner_intent": "spectral_change",
+    "change_domain": "mining",
+    "required_tools": [
+      "fetch_imagery",
+      "detect_change",
+      "fuse_evidence",
+      "generate_evidence"
+    ],
+    "region_count": 23,
+    "candidate_region_count": 23,
+    "changed_area_m2": 5172597.0,
+    "confidence": 0.0,
+    "answer": "Spectral change detected; no strong mining-related surface change signal alignment was found in the primary index or direction hint. 23 domain candidate regions and 23 spectral change regions mapped between 2017-06-01 and 2023-06-01. Mean detector confidence 0%. This is a spectral-change indication only \u2014 it cannot confirm mining activity without corroborating evidence.",
+    "answer_mentions_development_mock": false,
+    "step_timings": [
+      {
+        "tool_name": "plan_query",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "duration_ms": 486165,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_change",
+        "duration_ms": 13094,
+        "status": "completed"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "duration_ms": 0,
+        "status": "completed"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "duration_ms": 54,
+        "status": "completed"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "duration_ms": 51,
+        "status": "completed"
+      }
+    ],
+    "total_duration_ms": 499367,
+    "detector_metadata": {
+      "detector": "earth_engine_cva",
+      "data_mode": "earth_engine",
+      "raw_detection_count": 23,
+      "region_count": 23,
+      "detector_version": "1.2.0",
+      "method": "index_differencing",
+      "threshold": 0.15,
+      "primary_index": "ndvi",
+      "change_direction_hint": "vegetation_gain",
+      "seasonality_warnings": [
+        "t1_low_scene_count: only 1 scene(s) in composite window; preferred minimum is 2."
+      ]
+    },
+    "composite_provenance": {
+      "t1": {
+        "requested_date": "2017-06-01",
+        "window_start": "2017-05-17",
+        "window_end": "2017-06-16",
+        "scene_count": 1,
+        "scene_dates": [
+          "2017-06-06"
+        ]
+      },
+      "t2": {
+        "requested_date": "2023-06-01",
+        "window_start": "2023-05-17",
+        "window_end": "2023-06-16",
+        "scene_count": 4,
+        "scene_dates": [
+          "2023-05-31",
+          "2023-05-31",
+          "2023-05-28",
+          "2023-05-28"
+        ]
+      },
+      "imagery_strategy": "seasonal_median_composite",
+      "composite_method": "median"
+    },
+    "imagery_strategy": "seasonal_median_composite",
+    "trace_summary": [
+      {
+        "tool_name": "plan_query",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "planner=deterministic intent=spectral_change tools=fetch_imagery,detect_change,fuse_evidence,generate_evidence"
+      },
+      {
+        "tool_name": "fetch_imagery",
+        "status": "completed",
+        "duration_ms": 486165,
+        "summary": "Built median composites: T1 1 scenes (2017-05-17\u20132017-06-16), T2 4 scenes (2023-05-17\u20132023-06-16)"
+      },
+      {
+        "tool_name": "detect_change",
+        "status": "completed",
+        "duration_ms": 13094,
+        "summary": "Detected 23 region(s) via earth_engine_cva"
+      },
+      {
+        "tool_name": "analyze_semantics",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "analyze_semantics skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "detect_sar_change",
+        "status": "completed",
+        "duration_ms": 0,
+        "summary": "detect_sar_change skipped (not required by analysis plan)"
+      },
+      {
+        "tool_name": "fuse_evidence",
+        "status": "completed",
+        "duration_ms": 54,
+        "summary": "Fused 23 evidence region(s) (1.0.0)"
+      },
+      {
+        "tool_name": "generate_evidence",
+        "status": "completed",
+        "duration_ms": 51,
+        "summary": "Validated 23 evidence region(s)"
+      }
+    ],
+    "quantitative": null,
+    "qualitative_assessment": {
+      "detected_regions": true,
+      "has_domain_candidates": true,
+      "expected_change": "Surface disturbance near documented European open-cast mining activity.",
+      "reference": "EuroMineNet multitemporal mining footprint benchmark (EU, Sentinel-2 2015\u20132024)."
+    }
+  }
+]

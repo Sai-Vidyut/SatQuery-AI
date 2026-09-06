@@ -108,6 +108,15 @@ class EvaluationRecord(BaseModel):
     total_duration_ms: int | None = None
 
     detector_metadata: dict[str, Any] = Field(default_factory=dict)
+    composite_provenance: dict[str, Any] = Field(default_factory=dict)
+    imagery_strategy: str | None = None
+    requested_earlier_date: date | None = None
+    requested_later_date: date | None = None
+    actual_t1_window: dict[str, Any] | None = None
+    actual_t2_window: dict[str, Any] | None = None
+    fallback_events: list[dict[str, Any]] = Field(default_factory=list)
+    confidence_semantics: str | None = None
+    demonstration_data: bool = False
     trace_summary: list[dict[str, Any]] = Field(default_factory=list)
     quantitative: QuantitativeMetrics | None = None
 

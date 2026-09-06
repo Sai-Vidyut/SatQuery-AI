@@ -361,27 +361,73 @@ def domain_metrics_from_regions(
     return metrics
 
 
+def is_water_direction_ambiguous(
+    domain: ChangeDomain,
+    *,
+    direction_hint: str | None,
+    strength: ClaimStrength,
+) -> bool:
+    """
+    True when a water-shrinkage query cannot confidently assert contraction vs expansion.
+
+    Preserves underlying detector metadata for inspection; answer layer stays conservative.
+    """
+    if domain != ChangeDomain.WATER_SHRINKAGE:
+        return False
+    if direction_hint == "water_expansion":
+        return True
+    if direction_hint not in _DIRECTION_ALIGNMENT.get(domain, frozenset()):
+        return True
+    if strength == ClaimStrength.DETECTED:
+        return True
+    return False
+
+
 def compose_domain_answer_clause(
     domain: ChangeDomain,
     *,
     strength: ClaimStrength,
     direction_hint: str | None,
     primary_index: str | None,
+    region_count: int = 0,
+    candidate_count: int = 0,
 ) -> str:
     from app.evidence.bi_temporal_interpretation import format_primary_index, humanize_direction_hint
 
     label = domain_label(domain)
+
+    if is_water_direction_ambiguous(domain, direction_hint=direction_hint, strength=strength):
+        if region_count > 0:
+            return (
+                "Water-related spectral change detected; the direction is inconclusive "
+                f"({region_count} mapped region{'s' if region_count != 1 else ''})."
+            )
+        return "Water-related spectral change detected; the direction is inconclusive."
+
     if strength == ClaimStrength.DETECTED:
+        if region_count > 0:
+            return (
+                f"Spectral change detected across {region_count} mapped region"
+                f"{'s' if region_count != 1 else ''}; "
+                f"no strong {label} signal alignment in the primary index or direction hint."
+            )
         return (
             f"Spectral change detected; no strong {label} signal alignment was found "
             "in the primary index or direction hint."
         )
+
     index_label = format_primary_index(primary_index)
     hint_text = humanize_direction_hint(direction_hint) if direction_hint else "no directional signal"
     if strength == ClaimStrength.SUPPORTED:
+        region_note = ""
+        if candidate_count > 0:
+            region_note = (
+                f" {candidate_count} domain candidate region"
+                f"{'s' if candidate_count != 1 else ''} mapped."
+            )
         return (
             f"Change is consistent with {label} based on {index_label} "
-            f"and a direction hint of {hint_text}."
+            f"and a direction hint of {hint_text}.{region_note}"
         )
     return (
         f"Region is a potential {label} candidate based on {index_label}, "

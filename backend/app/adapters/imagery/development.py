@@ -61,7 +61,23 @@ class DevelopmentImageryProvider(ImageryProvider):
             scenes=scenes,
             spatial=SpatialMetadata(bbox=bbox, resolution_m=resolution),
             message=(
-                "Development imagery adapter: no Earth Engine credentials used. "
-                "Scene IDs and metadata are deterministic demo data."
+                "DEMONSTRATION DATA: development imagery adapter with deterministic scene metadata. "
+                "Not real Earth observation."
             ),
+            provider_metadata={
+                "demonstration_data": True,
+                "imagery_strategy": "development_fixture",
+                "t1": {
+                    "requested_date": request.start_date.isoformat(),
+                    "window_start": request.start_date.isoformat(),
+                    "window_end": request.start_date.isoformat(),
+                    "scene_count": 1,
+                },
+                "t2": {
+                    "requested_date": request.end_date.isoformat(),
+                    "window_start": request.end_date.isoformat(),
+                    "window_end": request.end_date.isoformat(),
+                    "scene_count": 1,
+                },
+            },
         )

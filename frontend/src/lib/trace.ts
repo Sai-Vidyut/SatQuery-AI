@@ -1,4 +1,4 @@
-import type { PlanQueryMetadata, TraceStep } from "@/types/domain";
+import type { FetchImageryMetadata, PlanQueryMetadata, TraceStep } from "@/types/domain";
 
 const TOOL_LABELS: Record<string, string> = {
   plan_query: "Plan query",
@@ -32,6 +32,15 @@ export function isPlanQueryMetadata(
   metadata: TraceStep["metadata"],
 ): metadata is PlanQueryMetadata {
   return metadata != null && typeof metadata === "object" && "planner" in metadata;
+}
+
+export function isFetchImageryMetadata(metadata: TraceStep["metadata"]): boolean {
+  return (
+    metadata != null &&
+    typeof metadata === "object" &&
+    "imagery_strategy" in metadata &&
+    typeof (metadata as FetchImageryMetadata).imagery_strategy === "string"
+  );
 }
 
 export function formatDuration(ms: number | null | undefined): string | null {

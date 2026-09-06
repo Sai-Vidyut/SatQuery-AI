@@ -63,6 +63,7 @@ export interface QueryRequest {
   later_image_id?: string;
   optical_image_id?: string;
   sar_image_id?: string;
+  demo_mode?: boolean;
 }
 
 export type ImageModality = "optical" | "multispectral" | "sar";
@@ -236,6 +237,30 @@ export interface PlanQueryMetadata {
   duration_ms?: number;
 }
 
+export interface FetchImageryMetadata {
+  imagery_strategy?: string;
+  composite_method?: string;
+  demonstration_data?: boolean;
+  fallback_events?: Array<Record<string, unknown>>;
+  fallback_policy?: string;
+  t1?: {
+    requested_date?: string;
+    window_start?: string;
+    window_end?: string;
+    scene_count?: number;
+    scene_dates?: string[];
+    fallback?: Record<string, unknown>;
+  };
+  t2?: {
+    requested_date?: string;
+    window_start?: string;
+    window_end?: string;
+    scene_count?: number;
+    scene_dates?: string[];
+    fallback?: Record<string, unknown>;
+  };
+}
+
 export interface TraceStep {
   id: string;
   tool_name: string;
@@ -258,6 +283,7 @@ export interface AnalysisResult {
   evidence: EvidenceRegion[];
   trace: TraceStep[];
   mode: DataMode;
+  demonstration_data?: boolean;
   vqa?: SingleImageVQAResult | null;
   caption?: SingleImageCaptionResult | null;
   bi_temporal_change?: BiTemporalChangeResult | null;
@@ -276,5 +302,17 @@ export interface SubmitQueryData {
 
 export interface ErrorResponse {
   success: false;
-  error: { code: string; message: string; field?: string | null };
+  error: { code: string; message: string; user_message?: string | null; field?: string | null };
+}
+
+export class ApiError extends Error {
+  code: string;
+  userMessage: string;
+
+  constructor(code: string, message: string, userMessage?: string | null) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.userMessage = userMessage ?? message;
+  }
 }

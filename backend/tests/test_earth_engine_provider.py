@@ -44,7 +44,7 @@ SAMPLE_REQUEST = ImageryRequest(
 
 MOCK_CANDIDATES = [
     SceneCandidate("20240112T050701", "COPERNICUS/S2_SR_HARMONIZED/20240112T050701", date(2024, 1, 12), 8.5, {}),
-    SceneCandidate("20240303T050701", "COPERNICUS/S2_SR_HARMONIZED/20240303T050701", date(2024, 3, 3), 12.0, {}),
+    SceneCandidate("20240325T050701", "COPERNICUS/S2_SR_HARMONIZED/20240325T050701", date(2024, 3, 25), 12.0, {}),
 ]
 
 
@@ -66,19 +66,25 @@ async def test_earth_engine_provider_returns_real_metadata(mock_ee_client):
             return_value=MOCK_CANDIDATES,
         ),
         patch(
-            "app.adapters.imagery.earth_engine.provider.select_anchor_scenes",
-            return_value=MOCK_CANDIDATES,
-        ),
+            "app.adapters.imagery.earth_engine.provider.build_composite_epochs",
+        ) as mock_composite,
     ):
+        from app.adapters.imagery.earth_engine.composite import build_composite_epochs
+
+        mock_composite.side_effect = lambda c, **kw: build_composite_epochs(
+            c,
+            requested_start=kw["requested_start"],
+            requested_end=kw["requested_end"],
+        )
         result = await provider.fetch(SAMPLE_REQUEST)
 
     assert result.mode == DataMode.EARTH_ENGINE
     assert result.source == "google-earth-engine"
     assert result.collection_id == "COPERNICUS/S2_SR_HARMONIZED"
     assert len(result.scenes) == 2
-    assert result.scenes[0].platform_id.startswith("COPERNICUS/S2_SR_HARMONIZED/")
-    assert result.provider_metadata["selection_policy"] == "1.1.0"
-    assert result.message is None
+    assert result.scenes[0].platform_id.startswith("COMPOSITE/MEDIAN/")
+    assert result.provider_metadata["selection_policy"] == "2.1.0"
+    assert result.provider_metadata["imagery_strategy"] == "seasonal_median_composite"
 
 
 @pytest.mark.asyncio
@@ -133,7 +139,8 @@ async def test_development_provider_still_labeled_development():
     result = await provider.fetch(SAMPLE_REQUEST)
     assert result.mode == DataMode.DEVELOPMENT
     assert result.source == "satquery-development-imagery"
-    assert "Development imagery adapter" in (result.message or "")
+    assert "DEMONSTRATION DATA" in (result.message or "")
+    assert result.provider_metadata.get("demonstration_data") is True
 
 
 @pytest.mark.asyncio

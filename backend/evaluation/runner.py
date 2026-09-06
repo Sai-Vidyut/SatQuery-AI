@@ -34,15 +34,18 @@ def _region_area_total(regions) -> float:
     return total
 
 
-def _extract_scenes(result) -> list[dict[str, Any]]:
-    for step in result.trace:
-        if step.tool_name != "fetch_imagery":
-            continue
+def _extract_fetch_metadata(result) -> dict[str, Any]:
     fetch_step = next((s for s in result.trace if s.tool_name == "fetch_imagery"), None)
     if fetch_step and fetch_step.metadata:
-        scenes = fetch_step.metadata.get("scenes")
-        if isinstance(scenes, list):
-            return scenes
+        return dict(fetch_step.metadata)
+    return {}
+
+
+def _extract_scenes(result) -> list[dict[str, Any]]:
+    fetch_meta = _extract_fetch_metadata(result)
+    scenes = fetch_meta.get("scenes")
+    if isinstance(scenes, list):
+        return scenes
     return []
 
 
@@ -81,6 +84,7 @@ class EvaluationRunner:
         plan_meta = (plan_step.metadata or {}) if plan_step else {}
         detect_step = next((s for s in result.trace if s.tool_name == "detect_change"), None)
         detect_meta = (detect_step.metadata or {}) if detect_step else {}
+        fetch_meta = _extract_fetch_metadata(result)
 
         domain_enum = ChangeDomain(case.domain) if case.domain in ChangeDomain._value2member_map_ else None
         claim_type = DOMAIN_CLAIM_TYPES.get(domain_enum) if domain_enum else None
@@ -89,6 +93,12 @@ class EvaluationRunner:
             if claim_type
             else 0
         )
+
+        t1_meta = fetch_meta.get("t1") if isinstance(fetch_meta.get("t1"), dict) else None
+        t2_meta = fetch_meta.get("t2") if isinstance(fetch_meta.get("t2"), dict) else None
+        fallback_events = fetch_meta.get("fallback_events")
+        if not isinstance(fallback_events, list):
+            fallback_events = []
 
         record = EvaluationRecord(
             case_id=case.case_id,
@@ -104,11 +114,13 @@ class EvaluationRunner:
             required_tools=plan_meta.get("required_tools") or [],
             region_count=len(result.evidence),
             candidate_region_count=candidate_count,
-            changed_area_m2=_region_area_total(result.evidence) or None,
+            changed_area_m2=_region_area_total(result.evidence) or detect_meta.get("area_m2"),
             confidence=result.confidence,
             answer=result.answer,
-            answer_mentions_development_mock="development demo data" in (result.answer or "").lower()
-            or "development uploaded cva" in (result.answer or "").lower(),
+            answer_mentions_development_mock=(
+                "demonstration data" in (result.answer or "").lower()
+                or result.demonstration_data
+            ),
             step_timings=[
                 StepTiming(
                     tool_name=step.tool_name,
@@ -119,6 +131,22 @@ class EvaluationRunner:
             ],
             total_duration_ms=int((perf_counter() - t0) * 1000),
             detector_metadata=detect_meta if isinstance(detect_meta, dict) else {},
+            composite_provenance={
+                "t1": fetch_meta.get("t1"),
+                "t2": fetch_meta.get("t2"),
+                "imagery_strategy": fetch_meta.get("imagery_strategy"),
+                "composite_method": fetch_meta.get("composite_method"),
+                "fallback_events": fallback_events,
+                "fallback_policy": fetch_meta.get("fallback_policy"),
+            },
+            imagery_strategy=fetch_meta.get("imagery_strategy"),
+            requested_earlier_date=case.earlier_date,
+            requested_later_date=case.later_date,
+            actual_t1_window=t1_meta,
+            actual_t2_window=t2_meta,
+            fallback_events=fallback_events,
+            confidence_semantics=detect_meta.get("confidence_kind") or "histogram_separability",
+            demonstration_data=result.demonstration_data,
             trace_summary=[
                 {
                     "tool_name": step.tool_name,

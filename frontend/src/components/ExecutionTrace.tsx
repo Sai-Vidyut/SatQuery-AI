@@ -1,7 +1,7 @@
 "use client";
 
-import type { TraceStep } from "@/types/domain";
-import { formatDuration, isPlanQueryMetadata, traceStepLabel } from "@/lib/trace";
+import type { FetchImageryMetadata, PlanQueryMetadata, TraceStep } from "@/types/domain";
+import { formatDuration, isPlanQueryMetadata, isFetchImageryMetadata, traceStepLabel } from "@/lib/trace";
 
 type Props = {
   steps: TraceStep[];
@@ -65,6 +65,75 @@ function PlanQueryDetails({ metadata }: { metadata: TraceStep["metadata"] }) {
   );
 }
 
+function FetchImageryDetails({ metadata }: { metadata: FetchImageryMetadata }) {
+  const t1 = metadata.t1;
+  const t2 = metadata.t2;
+  const strategy = metadata.imagery_strategy ?? "unknown";
+  return (
+    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--sq-text-faint)]">
+      <div>
+        <dt>Imagery strategy</dt>
+        <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+          {strategy}
+          {metadata.composite_method ? ` (${metadata.composite_method})` : ""}
+        </dd>
+      </div>
+      {metadata.demonstration_data ? (
+        <div>
+          <dt>Data source</dt>
+          <dd className="text-[var(--sq-amber)]">DEMONSTRATION DATA</dd>
+        </div>
+      ) : null}
+      {t1 ? (
+        <div>
+          <dt>T1 requested / window</dt>
+          <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+            {t1.requested_date ?? "?"} → {t1.window_start}–{t1.window_end} ·{" "}
+            {t1.scene_count ?? "?"} scene(s)
+          </dd>
+        </div>
+      ) : null}
+      {t2 ? (
+        <div>
+          <dt>T2 requested / window</dt>
+          <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+            {t2.requested_date ?? "?"} → {t2.window_start}–{t2.window_end} ·{" "}
+            {t2.scene_count ?? "?"} scene(s)
+          </dd>
+        </div>
+      ) : null}
+      {metadata.fallback_events?.length ? (
+        <div>
+          <dt>Imagery fallback</dt>
+          <dd className="mt-0.5 break-words" style={{ fontFamily: "var(--sq-font-mono)" }}>
+            {metadata.fallback_events
+              .map((e) => `${String(e.epoch)}: ${String(e.policy_decision ?? "fallback")}`)
+              .join("; ")}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
+function TimingSummary({ steps }: { steps: TraceStep[] }) {
+  const timed = steps.filter((s) => s.duration_ms != null && s.duration_ms > 0);
+  if (timed.length === 0) return null;
+  const total = timed.reduce((sum, s) => sum + (s.duration_ms ?? 0), 0);
+  const keyTools = ["fetch_imagery", "detect_change", "analyze_semantics", "generate_evidence"];
+  const breakdown = keyTools
+    .map((name) => {
+      const step = timed.find((s) => s.tool_name === name);
+      return step ? `${name.replace(/_/g, " ")} ${formatDuration(step.duration_ms)}` : null;
+    })
+    .filter(Boolean);
+  return (
+    <p className="mt-2 text-[10px] text-[var(--sq-text-faint)]" data-testid="trace-timing-summary">
+      Timing: {breakdown.join(" · ")} · total {formatDuration(total)}
+    </p>
+  );
+}
+
 const SKELETON_STEPS = [
   "plan_query",
   "fetch_imagery",
@@ -124,6 +193,9 @@ export function ExecutionTrace({ steps, loading }: Props) {
               {step.tool_name === "plan_query" && step.metadata ? (
                 <PlanQueryDetails metadata={step.metadata} />
               ) : null}
+              {step.tool_name === "fetch_imagery" && isFetchImageryMetadata(step.metadata) ? (
+                <FetchImageryDetails metadata={step.metadata as FetchImageryMetadata} />
+              ) : null}
               {step.error ? (
                 <p className="mt-0.5 text-[11px] text-[var(--sq-danger)]">{step.error}</p>
               ) : null}
@@ -136,6 +208,7 @@ export function ExecutionTrace({ steps, loading }: Props) {
           </li>
         ))}
       </ul>
+      <TimingSummary steps={steps} />
     </section>
   );
 }

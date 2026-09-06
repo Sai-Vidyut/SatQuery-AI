@@ -9,6 +9,7 @@ import type {
   TraceStep,
   UploadImageResponse,
 } from "@/types/domain";
+import { ApiError } from "@/types/domain";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -22,8 +23,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = await res.json();
   if (!res.ok) {
+    const code = body?.error?.code ?? "analysis_failed";
     const message = body?.error?.message ?? res.statusText;
-    throw new Error(message);
+    const userMessage = body?.error?.user_message ?? message;
+    throw new ApiError(code, message, userMessage);
   }
   return (body as ApiResponse<T>).data;
 }

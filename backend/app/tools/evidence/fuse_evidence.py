@@ -25,5 +25,10 @@ class FuseEvidenceTool(Tool[FuseEvidenceInput, FuseEvidenceOutput]):
                 "semantic_region_count": len(payload.semantic.regions) if payload.semantic else 0,
                 "sar_region_count": len(payload.sar_detections.regions) if payload.sar_detections else 0,
                 "fused_region_count": len(regions),
+                "detector_metadata": payload.cva_detections.detector_metadata or {},
+                "confidence_kind": (
+                    (payload.cva_detections.detector_metadata or {}).get("confidence_kind")
+                    or "histogram_separability"
+                ),
             },
         )

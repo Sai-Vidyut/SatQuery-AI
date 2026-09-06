@@ -87,6 +87,7 @@ export function Workspace() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [statusLine, setStatusLine] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [inputMode, setInputMode] = useState<ComposerInputMode>("catalog");
   const [uploadedImage, setUploadedImage] = useState<ImageInput | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -362,6 +363,7 @@ export function Workspace() {
         aoi,
         earlier_date: earlierDate,
         later_date: laterDate,
+        demo_mode: demoMode,
       };
     }
 
@@ -410,7 +412,7 @@ export function Workspace() {
       setRunning(false);
       runStartedAt.current = null;
     }
-  }, [aoi, earlierDate, laterDate, inputMode, query, syncUrl, uploadedImage, uploadedEarlierImage, uploadedLaterImage, uploadedOpticalImage, uploadedSarImage]);
+  }, [aoi, demoMode, earlierDate, laterDate, inputMode, query, syncUrl, uploadedImage, uploadedEarlierImage, uploadedLaterImage, uploadedOpticalImage, uploadedSarImage]);
 
   const handleBboxSubmit = useCallback(
     (text: string) => {
@@ -609,6 +611,8 @@ export function Workspace() {
         }}
         onRun={handleRun}
         onBboxSubmit={handleBboxSubmit}
+        demoMode={demoMode}
+        onDemoModeChange={setDemoMode}
       />
     </main>
   );

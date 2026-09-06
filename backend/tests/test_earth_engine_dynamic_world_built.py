@@ -119,7 +119,9 @@ def test_evaluate_cva_region_passes_with_mocked_probabilities(mock_client):
         "app.adapters.semantic.earth_engine.dynamic_world_built.sample_built_probability",
         side_effect=[0.10, 0.30],
     ):
-        result = evaluate_cva_region(ee, mock_client, CVA_REGION, date(2024, 12, 8), date(2025, 2, 26))
+        result = evaluate_cva_region(
+            ee, mock_client, CVA_REGION, EE_IMAGERY.scenes[0], EE_IMAGERY.scenes[-1]
+        )
 
     assert result is not None
     assert result["delta_built"] == pytest.approx(0.20)
@@ -132,7 +134,9 @@ def test_evaluate_cva_region_fails_low_delta(mock_client):
         "app.adapters.semantic.earth_engine.dynamic_world_built.sample_built_probability",
         side_effect=[0.20, 0.30],
     ):
-        result = evaluate_cva_region(ee, mock_client, CVA_REGION, date(2024, 12, 8), date(2025, 2, 26))
+        result = evaluate_cva_region(
+            ee, mock_client, CVA_REGION, EE_IMAGERY.scenes[0], EE_IMAGERY.scenes[-1]
+        )
     assert result is None
 
 

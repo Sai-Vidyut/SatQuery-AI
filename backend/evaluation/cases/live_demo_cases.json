@@ -1,0 +1,87 @@
+{
+  "version": "1.0.0",
+  "description": "Phase 10 recommended live Earth Engine demo scenarios from Phase 9A validation. Not benchmark-accurate — selected for scene availability, runtime, and visual clarity.",
+  "cases": [
+    {
+      "case_id": "live_demo_deforestation_amazon",
+      "source_case_id": "deforestation_amazon_rondonia",
+      "domain": "deforestation",
+      "title": "Amazon deforestation frontier (live demo)",
+      "query": "Show deforestation and vegetation loss in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [-61.45, -10.85],
+              [-61.40, -10.85],
+              [-61.40, -10.80],
+              [-61.45, -10.80],
+              [-61.45, -10.85]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2019-08-01",
+      "later_date": "2023-08-01",
+      "recommended_reason": "Stable dry-season scene availability; clear vegetation-loss signal; ~9 regions in Phase 9A; moderate runtime.",
+      "phase9a_notes": "Phase 8 completed with vegetation_loss direction; 9 regions.",
+      "evaluation_type": "qualitative",
+      "ground_truth_available": false
+    },
+    {
+      "case_id": "live_demo_infrastructure_dubai",
+      "source_case_id": "infrastructure_dubai_south",
+      "domain": "infrastructure_development",
+      "title": "Dubai south infrastructure growth (live demo)",
+      "query": "Highlight possible infrastructure development in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [55.12, 24.85],
+              [55.20, 24.85],
+              [55.20, 24.92],
+              [55.12, 24.92],
+              [55.12, 24.85]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2018-01-01",
+      "later_date": "2024-01-01",
+      "recommended_reason": "Reliable Sentinel-2 coverage; visually obvious built-up growth; short AOI; completed in Phase 9A.",
+      "phase9a_notes": "Phase 8 completed with 8 regions; built-up increase signal.",
+      "evaluation_type": "qualitative",
+      "ground_truth_available": false
+    },
+    {
+      "case_id": "live_demo_mining_saxony",
+      "source_case_id": "mining_disturbance_eu_reference",
+      "domain": "mining",
+      "title": "Open-pit mining disturbance (live demo)",
+      "query": "Find areas of land disturbance consistent with mining in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [12.30, 51.05],
+              [12.38, 51.05],
+              [12.38, 51.10],
+              [12.30, 51.10],
+              [12.30, 51.05]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2017-06-01",
+      "later_date": "2023-06-01",
+      "recommended_reason": "Consistent completion in Phase 9A; many mapped regions; European AOI with good S2 revisit.",
+      "phase9a_notes": "Phase 8 completed with 23 regions.",
+      "evaluation_type": "qualitative",
+      "ground_truth_available": false
+    }
+  ]
+}

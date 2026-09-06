@@ -23,7 +23,7 @@ from app.adapters.semantic.earth_engine.metrics import (
     passes_semantic_thresholds,
     polygon_area_m2,
 )
-from app.adapters.semantic.earth_engine.temporal import anchor_temporal_window
+from app.adapters.semantic.earth_engine.imagery_epoch import imagery_epoch_window
 from app.core.errors import SatQueryError
 from app.evidence.fusion import compute_overlap_fraction
 from app.schemas.domain import (
@@ -31,6 +31,7 @@ from app.schemas.domain import (
     EvidenceRegion,
     GeoJSONGeometry,
     ImageryResult,
+    ImageryScene,
     Metric,
     SemanticAnalysisInput,
     SemanticAnalysisOutput,
@@ -75,16 +76,16 @@ def evaluate_cva_region(
     ee: Any,
     client: EarthEngineClient,
     cva_region: EvidenceRegion,
-    earlier_anchor: date,
-    later_anchor: date,
+    earlier_scene: ImageryScene,
+    later_scene: ImageryScene,
 ) -> dict[str, Any] | None:
     """Evaluate one CVA region; return candidate dict or None if thresholds fail."""
     ring = cva_region.geometry.coordinates[0]
     area_m2 = polygon_area_m2(ring)
     ee_geometry = geojson_to_ee_geometry(ee, cva_region.geometry)
 
-    earlier_start, earlier_end = anchor_temporal_window(earlier_anchor)
-    later_start, later_end = anchor_temporal_window(later_anchor)
+    earlier_start, earlier_end = imagery_epoch_window(earlier_scene)
+    later_start, later_end = imagery_epoch_window(later_scene)
 
     earlier_mean = sample_built_probability(ee, client, ee_geometry, earlier_start, earlier_end)
     later_mean = sample_built_probability(ee, client, ee_geometry, later_start, later_end)
@@ -154,8 +155,8 @@ class EarthEngineDynamicWorldBuiltAnalyzer(SemanticAnalyzer):
         client = self._get_client()
         ee = client.ee
 
-        earlier_anchor = payload.imagery.scenes[0].acquisition_date
-        later_anchor = payload.imagery.scenes[-1].acquisition_date
+        earlier_scene = payload.imagery.scenes[0]
+        later_scene = payload.imagery.scenes[-1]
 
         regions: list[EvidenceRegion] = []
         claims: list[SemanticClaim] = []
@@ -164,7 +165,7 @@ class EarthEngineDynamicWorldBuiltAnalyzer(SemanticAnalyzer):
         try:
             for idx, cva_region in enumerate(payload.change_regions, start=1):
                 evaluated += 1
-                result = evaluate_cva_region(ee, client, cva_region, earlier_anchor, later_anchor)
+                result = evaluate_cva_region(ee, client, cva_region, earlier_scene, later_scene)
                 if result is None:
                     continue
 
@@ -218,8 +219,8 @@ class EarthEngineDynamicWorldBuiltAnalyzer(SemanticAnalyzer):
                         "policy_version": POLICY_VERSION,
                         "dataset": DYNAMIC_WORLD_COLLECTION,
                         "band": BUILT_BAND,
-                        "earlier_anchor_date": earlier_anchor.isoformat(),
-                        "later_anchor_date": later_anchor.isoformat(),
+                        "earlier_anchor_date": earlier_scene.acquisition_date.isoformat(),
+                        "later_anchor_date": later_scene.acquisition_date.isoformat(),
                         "earlier_window": result["earlier_window"],
                         "later_window": result["later_window"],
                     },
@@ -254,8 +255,8 @@ class EarthEngineDynamicWorldBuiltAnalyzer(SemanticAnalyzer):
                 "dataset": DYNAMIC_WORLD_COLLECTION,
                 "band": BUILT_BAND,
                 "temporal_window_policy": TEMPORAL_WINDOW_POLICY,
-                "earlier_anchor_date": earlier_anchor.isoformat(),
-                "later_anchor_date": later_anchor.isoformat(),
+                "earlier_anchor_date": earlier_scene.acquisition_date.isoformat(),
+                "later_anchor_date": later_scene.acquisition_date.isoformat(),
                 "cva_regions_evaluated": evaluated,
                 "semantic_candidates": len(regions),
                 "project": client.project,

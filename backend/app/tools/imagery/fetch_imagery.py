@@ -10,7 +10,7 @@ class FetchImageryTool(Tool[FetchImageryInput, FetchImageryOutput]):
     output_model = FetchImageryOutput
 
     async def execute(self, payload: FetchImageryInput) -> FetchImageryOutput:
-        provider = get_imagery_provider()
+        provider = get_imagery_provider(demo_mode=payload.request.demo_mode)
         result = await provider.fetch(payload.request)
         return FetchImageryOutput(result=result)
 

@@ -4,6 +4,10 @@ import asyncio
 from typing import Any
 
 from app.adapters.change.base import ChangeDetector
+from app.adapters.change.earth_engine.composite_loader import (
+    load_epoch_image,
+    validate_epoch_coverage,
+)
 from app.adapters.change.earth_engine.constants import (
     ANALYSIS_SCALE_M,
     CVA_BANDS,
@@ -13,8 +17,6 @@ from app.adapters.change.earth_engine.constants import (
 )
 from app.adapters.change.earth_engine.cva import (
     compute_change_magnitude,
-    load_scene_image,
-    prepare_scene,
 )
 from app.adapters.change.earth_engine.indices import (
     classify_direction_hint_from_median,
@@ -34,6 +36,7 @@ from app.schemas.domain import (
     ChangeDetectionOutput,
     DataMode,
     ImageryResult,
+    ImageryScene,
     SensorType,
 )
 
@@ -57,15 +60,17 @@ def _confidence_reference(threshold: float) -> float:
 
 def run_cva_detection(
     ee: Any,
-    before_platform_id: str,
-    after_platform_id: str,
+    before_scene: ImageryScene,
+    after_scene: ImageryScene,
     aoi_geometry: Any,
     threshold: float = CVA_MAGNITUDE_THRESHOLD,
     scale: float = ANALYSIS_SCALE_M,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Orchestrate CVA and return raw EE vector features plus detection context."""
-    before = prepare_scene(load_scene_image(ee, before_platform_id), ee)
-    after = prepare_scene(load_scene_image(ee, after_platform_id), ee)
+    before = load_epoch_image(ee, before_scene)
+    after = load_epoch_image(ee, after_scene)
+    validate_epoch_coverage(ee, before, aoi_geometry, epoch_label="T1", scale=scale)
+    validate_epoch_coverage(ee, after, aoi_geometry, epoch_label="T2", scale=scale)
     magnitude = compute_change_magnitude(before, after, ee)
     features = vectorize_change_regions(ee, magnitude, aoi_geometry, threshold=threshold, scale=scale)
     return features, {"method": "change_vector_analysis", "threshold": threshold, "primary_index": None}
@@ -73,15 +78,17 @@ def run_cva_detection(
 
 def run_index_detection(
     ee: Any,
-    before_platform_id: str,
-    after_platform_id: str,
+    before_scene: ImageryScene,
+    after_scene: ImageryScene,
     aoi_geometry: Any,
     primary_index: str,
     scale: float = ANALYSIS_SCALE_M,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Domain-aware index differencing on masked Sentinel-2 SR scenes."""
-    before = prepare_scene(load_scene_image(ee, before_platform_id), ee)
-    after = prepare_scene(load_scene_image(ee, after_platform_id), ee)
+    """Domain-aware index differencing on masked Sentinel-2 SR epochs."""
+    before = load_epoch_image(ee, before_scene)
+    after = load_epoch_image(ee, after_scene)
+    validate_epoch_coverage(ee, before, aoi_geometry, epoch_label="T1", scale=scale)
+    validate_epoch_coverage(ee, after, aoi_geometry, epoch_label="T2", scale=scale)
     threshold = _index_threshold(primary_index)
     magnitude, signed = compute_index_change_magnitude(before, after, primary_index, ee)
     features = vectorize_change_regions(ee, magnitude, aoi_geometry, threshold=threshold, scale=scale)
@@ -173,16 +180,16 @@ class EarthEngineChangeDetector(ChangeDetector):
             if primary_index:
                 features, detection_ctx = run_index_detection(
                     ee,
-                    before_scene.platform_id,
-                    after_scene.platform_id,
+                    before_scene,
+                    after_scene,
                     aoi_geom,
                     primary_index,
                 )
             else:
                 features, detection_ctx = run_cva_detection(
                     ee,
-                    before_scene.platform_id,
-                    after_scene.platform_id,
+                    before_scene,
+                    after_scene,
                     aoi_geom,
                 )
         except SatQueryError:
@@ -196,6 +203,7 @@ class EarthEngineChangeDetector(ChangeDetector):
 
         regions = features_to_evidence_regions(features)
         seasonality = (payload.imagery.provider_metadata or {}).get("seasonality", {})
+        composite = (payload.imagery.provider_metadata or {}).get("imagery_strategy")
 
         detector_metadata: dict[str, Any] = {
             "detector_version": DETECTOR_VERSION,
@@ -210,6 +218,7 @@ class EarthEngineChangeDetector(ChangeDetector):
             "after_acquisition_date": after_scene.acquisition_date.isoformat(),
             "requested_earlier_date": payload.earlier_date.isoformat(),
             "requested_later_date": payload.later_date.isoformat(),
+            "imagery_strategy": composite,
             "vector_feature_count": len(features),
             "project": client.project,
             "change_domain": domain.value if domain else None,
@@ -244,6 +253,14 @@ class EarthEngineChangeDetector(ChangeDetector):
                 raise SatQueryError(
                     "invalid_imagery_metadata",
                     f"Scene '{scene.scene_id}' is missing platform_id required for Earth Engine analysis.",
+                    status_code=400,
+                    field="imagery.scenes",
+                )
+            meta = scene.metadata or {}
+            if (scene.platform_id or "").startswith("COMPOSITE/") and not meta.get("scene_platform_ids"):
+                raise SatQueryError(
+                    "invalid_imagery_metadata",
+                    f"Composite scene '{scene.scene_id}' is missing scene_platform_ids.",
                     status_code=400,
                     field="imagery.scenes",
                 )

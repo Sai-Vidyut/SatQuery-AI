@@ -54,3 +54,9 @@ See `evaluation/cases/catalog_cases.json` — five qualitative catalog cases ali
 ## Phase 7 seasonality fixtures
 
 See `evaluation/cases/seasonality_cases.json` and `evaluation/PHASE7_REPORT.md`.
+
+## Phase 8 multi-scene composites
+
+Catalog Sentinel-2 path uses `seasonal_median_composite` (policy v2.0.0). See `evaluation/PHASE8_REPORT.md`.
+
+Live run: `EE_REAL_EVALUATION=true python scripts/run_evaluation.py`

@@ -1,0 +1,17 @@
+{
+  "source": "phase10_fixture_example",
+  "license_note": "Synthetic placeholder polygon for harness wiring only — not authoritative mining ground truth.",
+  "reference_url": "https://doi.org/10.14278/rodare.4656",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [12.32, 51.06],
+        [12.36, 51.06],
+        [12.36, 51.09],
+        [12.32, 51.09],
+        [12.32, 51.06]
+      ]
+    ]
+  }
+}

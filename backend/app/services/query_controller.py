@@ -511,6 +511,7 @@ class QueryController:
                 evidence=evidence_out.regions,
                 trace=trace,
                 mode=imagery_out.result.mode,
+                demonstration_data=request.demo_mode or imagery_out.result.mode == DataMode.DEVELOPMENT,
             )
             self._store.complete(session_id, result)
             return result
@@ -673,6 +674,7 @@ class QueryController:
                 "requested_modalities": [m.value for m in plan.requested_modalities],
                 "planner_version": plan.planner_version,
                 "fallback_used": plan_output.fallback_used,
+                "demo_mode": request.demo_mode,
                 "status": TraceStatus.COMPLETED.value,
                 "duration_ms": elapsed,
             }
@@ -1487,6 +1489,16 @@ class QueryController:
         if tool_name == "plan_query":
             return "Analysis plan validated"
         if tool_name == "fetch_imagery":
+            strategy = (output.result.provider_metadata or {}).get("imagery_strategy")
+            if strategy == "seasonal_median_composite":
+                t1 = (output.result.provider_metadata or {}).get("t1", {})
+                t2 = (output.result.provider_metadata or {}).get("t2", {})
+                return (
+                    f"Built median composites: T1 {t1.get('scene_count', '?')} scenes "
+                    f"({t1.get('window_start', '?')}–{t1.get('window_end', '?')}), "
+                    f"T2 {t2.get('scene_count', '?')} scenes "
+                    f"({t2.get('window_start', '?')}–{t2.get('window_end', '?')})"
+                )
             return f"Acquired {len(output.result.scenes)} scene(s) via {output.result.source}"
         if tool_name == "detect_change":
             detector = getattr(output, "detector", "unknown")
@@ -1511,22 +1523,39 @@ class QueryController:
     def _step_metadata(self, tool_name: str, output) -> dict[str, object] | None:
         if tool_name == "fetch_imagery":
             result = output.result
+            provider_meta = result.provider_metadata or {}
+            scenes_meta = []
+            for scene in result.scenes:
+                scene_entry: dict[str, object] = {
+                    "scene_id": scene.scene_id,
+                    "acquisition_date": scene.acquisition_date.isoformat(),
+                    "platform_id": scene.platform_id,
+                    "cloud_cover_percent": scene.cloud_cover_percent,
+                }
+                if scene.metadata:
+                    strategy = scene.metadata.get("imagery_strategy")
+                    if strategy:
+                        scene_entry["imagery_strategy"] = strategy
+                        scene_entry["composite_method"] = scene.metadata.get("composite_method")
+                        scene_entry["window_start"] = scene.metadata.get("window_start")
+                        scene_entry["window_end"] = scene.metadata.get("window_end")
+                        scene_entry["scene_count"] = scene.metadata.get("scene_count")
+                scenes_meta.append(scene_entry)
             return {
                 "provider": result.source,
                 "data_mode": result.mode.value,
                 "sensor": result.sensor.value,
                 "scene_count": len(result.scenes),
-                "scenes": [
-                    {
-                        "scene_id": scene.scene_id,
-                        "acquisition_date": scene.acquisition_date.isoformat(),
-                        "platform_id": scene.platform_id,
-                        "cloud_cover_percent": scene.cloud_cover_percent,
-                    }
-                    for scene in result.scenes
-                ],
-                "selection_policy": (result.provider_metadata or {}).get("selection_policy"),
-                "seasonality": (result.provider_metadata or {}).get("seasonality"),
+                "scenes": scenes_meta,
+                "selection_policy": provider_meta.get("selection_policy"),
+                "imagery_strategy": provider_meta.get("imagery_strategy"),
+                "composite_method": provider_meta.get("composite_method"),
+                "t1": provider_meta.get("t1"),
+                "t2": provider_meta.get("t2"),
+                "seasonality": provider_meta.get("seasonality"),
+                "fallback_events": provider_meta.get("fallback_events"),
+                "fallback_policy": provider_meta.get("fallback_policy"),
+                "demonstration_data": provider_meta.get("demonstration_data", False),
             }
         if tool_name == "detect_change":
             metadata = output.detector_metadata or {}
@@ -1541,6 +1570,10 @@ class QueryController:
                 "primary_index": metadata.get("primary_index"),
                 "change_direction_hint": metadata.get("change_direction_hint"),
                 "seasonality_warnings": metadata.get("seasonality_warnings"),
+                "confidence_kind": metadata.get("confidence_kind") or "histogram_separability",
+                "area_ha": metadata.get("area_ha"),
+                "area_m2": metadata.get("area_m2"),
+                "changed_percentage": metadata.get("changed_percentage"),
             }
         return None
 
@@ -1557,6 +1590,7 @@ class QueryController:
             end_date=request.later_date,
             sensor=sensor,
             preferences=request.preferences,
+            demo_mode=request.demo_mode,
         )
         return await self._fetch.execute(FetchImageryInput(request=imagery_request))
 
@@ -1615,6 +1649,12 @@ class QueryController:
         if trace and trace[-1].status == TraceStatus.RUNNING:
             trace[-1].status = TraceStatus.FAILED
             trace[-1].error = str(exc)
+            code = getattr(exc, "code", "analysis_failed")
+            trace[-1].metadata = {
+                **(trace[-1].metadata or {}),
+                "error_code": code,
+                "status": TraceStatus.FAILED.value,
+            }
 
 
 query_controller = QueryController()

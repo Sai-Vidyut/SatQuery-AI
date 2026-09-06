@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class ErrorDetail(BaseModel):
     code: str
     message: str
+    user_message: str | None = None
     field: str | None = None
 
 
@@ -25,6 +26,13 @@ class SatQueryError(Exception):
         super().__init__(message)
 
     def to_response(self) -> dict[str, Any]:
+        from app.core.user_errors import user_facing_message
+
         return ErrorResponse(
-            error=ErrorDetail(code=self.code, message=self.message, field=self.field),
+            error=ErrorDetail(
+                code=self.code,
+                message=self.message,
+                user_message=user_facing_message(self.code, self.message),
+                field=self.field,
+            ),
         ).model_dump()

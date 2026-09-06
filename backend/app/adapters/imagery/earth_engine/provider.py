@@ -5,7 +5,6 @@ import asyncio
 from app.adapters.imagery.base import ImageryProvider
 from app.adapters.imagery.earth_engine.client import EarthEngineClient
 from app.adapters.imagery.earth_engine.constants import (
-    SELECTION_POLICY_VERSION,
     SENTINEL1_GRD_COLLECTION,
     SENTINEL1_POLARIZATIONS,
     SENTINEL1_RESOLUTION_M,
@@ -14,13 +13,15 @@ from app.adapters.imagery.earth_engine.constants import (
     SENTINEL2_SR_COLLECTION,
 )
 from app.adapters.imagery.earth_engine.geometry import bbox_from_geometry, geojson_to_ee_geometry
-from app.adapters.imagery.earth_engine.seasonality import build_seasonality_provenance
+from app.adapters.imagery.earth_engine.composite import (
+    COMPOSITE_POLICY_VERSION,
+    build_composite_epochs,
+)
 from app.adapters.imagery.earth_engine.sentinel1 import (
     query_sentinel1_scenes,
     scene_has_polarizations,
     select_s1_anchor_scenes,
 )
-from app.adapters.imagery.earth_engine.selection import select_anchor_scenes
 from app.adapters.imagery.earth_engine.sentinel2 import SceneCandidate, query_sentinel2_scenes
 from app.core.errors import SatQueryError
 from app.schemas.domain import (
@@ -84,18 +85,10 @@ class EarthEngineProvider(ImageryProvider):
             cloud_cover_max=request.preferences.cloud_cover_max,
         )
 
-        selected = select_anchor_scenes(
+        composite_scenes, composite_provenance = build_composite_epochs(
             candidates,
-            start_date=request.start_date,
-            end_date=request.end_date,
-        )
-
-        scenes = [_candidate_to_scene(c) for c in selected]
-        seasonality = build_seasonality_provenance(
             requested_start=request.start_date,
             requested_end=request.end_date,
-            selected_dates=[s.acquisition_date for s in scenes],
-            selection_policy=SELECTION_POLICY_VERSION,
         )
 
         return ImageryResult(
@@ -103,16 +96,17 @@ class EarthEngineProvider(ImageryProvider):
             mode=DataMode.EARTH_ENGINE,
             sensor=SensorType.SENTINEL_2,
             collection_id=SENTINEL2_SR_COLLECTION,
-            scenes=scenes,
+            scenes=composite_scenes,
             spatial=SpatialMetadata(bbox=bbox, resolution_m=SENTINEL2_RESOLUTION_M),
             provider_metadata={
                 "provider": "earth_engine",
                 "project": client.project,
-                "selection_policy": SELECTION_POLICY_VERSION,
+                "selection_policy": COMPOSITE_POLICY_VERSION,
                 "candidate_count": len(candidates),
-                "selected_count": len(scenes),
+                "selected_count": len(composite_scenes),
                 "cloud_cover_max": request.preferences.cloud_cover_max,
-                "seasonality": seasonality,
+                "seasonality": composite_provenance,
+                **composite_provenance,
             },
             message=None,
         )

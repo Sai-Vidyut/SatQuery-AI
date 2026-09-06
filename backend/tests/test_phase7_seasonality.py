@@ -134,7 +134,7 @@ def test_build_seasonality_provenance_cross_season_warning():
         requested_start=date(2024, 1, 1),
         requested_end=date(2024, 9, 1),
         selected_dates=[date(2024, 1, 10), date(2024, 9, 5)],
-        selection_policy="1.1.0",
+        selection_policy="2.0.0",
     )
     assert prov["cross_season_comparison"] is True
     assert any("cross_season" in w for w in prov["warnings"])
@@ -145,7 +145,7 @@ def test_build_seasonality_provenance_same_season_no_warning():
         requested_start=date(2024, 6, 1),
         requested_end=date(2024, 6, 20),
         selected_dates=[date(2024, 6, 3), date(2024, 6, 18)],
-        selection_policy="1.1.0",
+        selection_policy="2.0.0",
     )
     assert prov["cross_season_comparison"] is False
     assert prov["warnings"] == []
@@ -277,7 +277,7 @@ async def test_ee_detector_records_seasonality_provenance(mock_client):
         requested_start=date(2024, 6, 1),
         requested_end=date(2024, 6, 20),
         selected_dates=[date(2024, 6, 3), date(2024, 6, 18)],
-        selection_policy="1.1.0",
+        selection_policy="2.0.0",
     )
     detector = EarthEngineChangeDetector(client=mock_client)
     payload = ChangeDetectionInput(
@@ -357,20 +357,29 @@ def test_phase6_evaluation_harness_still_loads():
 
 def test_run_cva_detection_returns_tuple():
     ee = MagicMock()
+    before = ImageryScene(
+        scene_id="before",
+        acquisition_date=date(2024, 6, 1),
+        platform_id="COPERNICUS/S2_SR_HARMONIZED/before",
+    )
+    after = ImageryScene(
+        scene_id="after",
+        acquisition_date=date(2024, 6, 20),
+        platform_id="COPERNICUS/S2_SR_HARMONIZED/after",
+    )
     with patch(
         "app.adapters.change.earth_engine.detector.vectorize_change_regions",
         return_value=[],
     ), patch(
-        "app.adapters.change.earth_engine.detector.prepare_scene",
-        return_value=MagicMock(),
+        "app.adapters.change.earth_engine.detector.validate_epoch_coverage",
     ), patch(
-        "app.adapters.change.earth_engine.detector.load_scene_image",
+        "app.adapters.change.earth_engine.detector.load_epoch_image",
         return_value=MagicMock(),
     ), patch(
         "app.adapters.change.earth_engine.detector.compute_change_magnitude",
         return_value=MagicMock(),
     ):
-        features, ctx = run_cva_detection(ee, "before", "after", "aoi")
+        features, ctx = run_cva_detection(ee, before, after, "aoi")
     assert features == []
     assert ctx["method"] == "change_vector_analysis"
 
