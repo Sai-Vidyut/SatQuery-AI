@@ -4,6 +4,19 @@ app/main.py
 app/adapters/change/base.py
 app/adapters/change/deterministic.py
 app/adapters/change/factory.py
+app/adapters/change/uploaded_bitemporal.py
+app/adapters/change/bi_temporal/__init__.py
+app/adapters/change/bi_temporal/confidence.py
+app/adapters/change/bi_temporal/config.py
+app/adapters/change/bi_temporal/detector.py
+app/adapters/change/bi_temporal/errors.py
+app/adapters/change/bi_temporal/indices.py
+app/adapters/change/bi_temporal/metrics.py
+app/adapters/change/bi_temporal/morphology.py
+app/adapters/change/bi_temporal/pipeline.py
+app/adapters/change/bi_temporal/raster_io.py
+app/adapters/change/bi_temporal/trace.py
+app/adapters/change/bi_temporal/validator.py
 app/adapters/change/earth_engine/__init__.py
 app/adapters/change/earth_engine/cloud_mask.py
 app/adapters/change/earth_engine/constants.py
@@ -65,6 +78,7 @@ app/schemas/bi_temporal_change.py
 app/schemas/change_understanding.py
 app/schemas/cross_modal.py
 app/schemas/domain.py
+app/schemas/geochat_service.py
 app/schemas/input.py
 app/schemas/planning.py
 app/schemas/vqa.py
@@ -131,6 +145,8 @@ tests/test_phase10_single_image_vqa.py
 tests/test_phase11_single_image_caption.py
 tests/test_phase12_bi_temporal_change.py
 tests/test_phase13_cross_modal_optical_sar.py
+tests/test_phase14_geochat_service.py
+tests/test_phase3_upload_integration.py
 tests/test_pipeline_integration.py
 tests/test_query_controller_semantic.py
 tests/test_query_planner.py
@@ -143,3 +159,4 @@ tests/test_semantic_pipeline_integration.py
 tests/test_upload_api.py
 tests/test_upload_compatibility.py
 tests/test_upload_storage.py
+tests/test_uploaded_bitemporal_change.py

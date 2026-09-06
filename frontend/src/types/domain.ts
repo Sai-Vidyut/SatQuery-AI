@@ -150,6 +150,40 @@ export interface CrossModalOpticalSARResult {
   confidence_available: boolean;
 }
 
+export interface BiTemporalSceneMetrics {
+  changed_pixel_count?: number | null;
+  total_pixel_count?: number | null;
+  changed_percentage?: number | null;
+  area_m2?: number | null;
+  area_ha?: number | null;
+  area_km2?: number | null;
+  region_count?: number | null;
+}
+
+export interface BiTemporalDetectorSummary {
+  detector: string;
+  algorithm?: string | null;
+  detector_version?: string | null;
+  primary_index?: string | null;
+  change_direction_hint?: string | null;
+  histogram_confidence?: number | null;
+  confidence_kind?: "histogram_separability" | null;
+}
+
+export interface BiTemporalImageProvenance {
+  earlier_source_ref?: string | null;
+  later_source_ref?: string | null;
+  earlier_filename?: string | null;
+  later_filename?: string | null;
+  earlier_modality?: string | null;
+  later_modality?: string | null;
+  earlier_band_names?: string[] | null;
+  later_band_names?: string[] | null;
+  crs?: string | null;
+  coregistration_performed?: boolean | null;
+  positional_band_fallback_used?: boolean | null;
+}
+
 export interface BiTemporalChangeResult {
   task: "bi_temporal_change_vqa";
   change_summary: string;
@@ -161,12 +195,16 @@ export interface BiTemporalChangeResult {
   provenance: string;
   confidence?: number | null;
   confidence_available: boolean;
+  confidence_kind?: "histogram_separability" | null;
   earlier_image_id: string;
   later_image_id: string;
   earlier_acquisition: string;
   later_acquisition: string;
   earlier_date: string;
   later_date: string;
+  scene_metrics?: BiTemporalSceneMetrics | null;
+  detector_summary?: BiTemporalDetectorSummary | null;
+  image_provenance?: BiTemporalImageProvenance | null;
   inference_metadata?: Record<string, unknown>;
 }
 

@@ -78,6 +78,17 @@ class GenerateEvidenceTool(Tool[GenerateEvidenceInput, GenerateEvidenceOutput]):
                 )
             )
 
+        detector_metadata = payload.fusion_metadata.get("detector_metadata")
+        if isinstance(detector_metadata, dict) and detector_metadata:
+            from app.evidence.bi_temporal_interpretation import metrics_from_detector_metadata
+
+            source = payload.fusion_metadata.get("source") or "uploaded_bi_temporal_cva"
+            existing_names = {metric.name for metric in metrics}
+            for metric in metrics_from_detector_metadata(detector_metadata, source=str(source)):
+                if metric.name not in existing_names:
+                    metrics.append(metric)
+                    existing_names.add(metric.name)
+
         return GenerateEvidenceOutput(
             regions=regions,
             metrics=metrics,

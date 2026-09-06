@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     geochat_service_url: str | None = None
     geochat_model_id: str = "MBZUAI/geochat-7B"
     geochat_service_timeout_s: float = 120.0
+    # Upload bi-temporal change detection: bi_temporal (real raster pipeline) | deterministic (seeded mock)
+    upload_change_detector: str = "bi_temporal"
 
     @property
     def effective_change_detector(self) -> str:

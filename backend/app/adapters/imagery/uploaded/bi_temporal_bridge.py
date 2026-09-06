@@ -78,7 +78,12 @@ def build_imagery_result_from_pair(earlier: ImageInput, later: ImageInput) -> Im
     )
 
 
-def build_change_detection_input(earlier: ImageInput, later: ImageInput) -> ChangeDetectionInput:
+def build_change_detection_input(
+    earlier: ImageInput,
+    later: ImageInput,
+    *,
+    query_hint: str | None = None,
+) -> ChangeDetectionInput:
     if not earlier.acquisition_datetime or not later.acquisition_datetime:
         raise ValueError("Both images must include acquisition_datetime for bi-temporal CVA.")
     bounds = earlier.bounds or later.bounds
@@ -91,4 +96,5 @@ def build_change_detection_input(earlier: ImageInput, later: ImageInput) -> Chan
         earlier_date=earlier.acquisition_datetime.date(),
         later_date=later.acquisition_datetime.date(),
         imagery=build_imagery_result_from_pair(earlier, later),
+        query_hint=query_hint,
     )

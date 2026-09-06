@@ -250,6 +250,10 @@ class ChangeDetectionInput(BaseModel):
     earlier_date: date
     later_date: date
     imagery: ImageryResult
+    query_hint: str | None = Field(
+        default=None,
+        description="Optional natural-language hint for index selection on uploaded pairs.",
+    )
 
 
 class ChangeDetectionOutput(BaseModel):

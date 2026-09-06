@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 from time import perf_counter
 
-from app.adapters.change.deterministic import DeterministicChangeDetector
+from app.adapters.change.factory import get_upload_change_detector
 from app.adapters.imagery.uploaded.bi_temporal_bridge import build_change_detection_input
 from app.adapters.imagery.uploaded.cross_modal_bridge import (
     build_cross_modal_imagery_result,
@@ -73,7 +73,7 @@ class QueryController:
         self._store = store or session_store
         self._fetch = FetchImageryTool()
         self._detect = DetectChangeTool()
-        self._upload_detect = DetectChangeTool(detector=DeterministicChangeDetector())
+        self._upload_detect = DetectChangeTool(detector=get_upload_change_detector())
         self._detect_sar = DetectSARChangeTool()
         self._semantic = AnalyzeSemanticsTool()
         self._fuse = FuseEvidenceTool()
@@ -242,16 +242,21 @@ class QueryController:
                     status_code=500,
                 )
 
-            detections = await self._run_uploaded_detect_change_step(trace, earlier, later, plan)
+            detections = await self._run_uploaded_detect_change_step(trace, request, earlier, later, plan)
+            detector_meta = detections.detector_metadata or {}
+            from app.evidence.bi_temporal_interpretation import (
+                enrich_region_metadata,
+                metrics_from_detector_metadata,
+            )
+
             regions = [
                 r.model_copy(
                     update={
-                        "metadata": {
-                            **r.metadata,
-                            "evidence_type": "spectral_change",
-                            "evidence_modality": "optical",
-                            "claim_type": "none",
-                        }
+                        "metadata": enrich_region_metadata(
+                            r,
+                            detector=detections.detector,
+                            detector_metadata=detector_meta,
+                        )
                     }
                 )
                 for r in detections.regions
@@ -274,13 +279,21 @@ class QueryController:
                 if understanding.result.confidence_available
                 else evidence_out.confidence
             )
+            detector_metrics = metrics_from_detector_metadata(
+                detector_meta,
+                source=detections.detector,
+            )
+            existing_metric_names = {metric.name for metric in evidence_out.metrics}
+            merged_metrics = evidence_out.metrics + [
+                metric for metric in detector_metrics if metric.name not in existing_metric_names
+            ]
             result = AnalysisResult(
                 status=AnalysisStatus.COMPLETED,
                 session_id=session_id,
                 answer=answer,
                 confidence=confidence,
                 confidence_available=understanding.result.confidence_available or bool(regions),
-                metrics=evidence_out.metrics,
+                metrics=merged_metrics,
                 evidence=evidence_out.regions,
                 trace=trace,
                 mode=DataMode.DEVELOPMENT,
@@ -612,6 +625,7 @@ class QueryController:
     async def _run_uploaded_detect_change_step(
         self,
         trace: list[TraceStep],
+        request: QueryRequest,
         earlier: ImageInput,
         later: ImageInput,
         plan: QueryAnalysisPlan,
@@ -627,7 +641,7 @@ class QueryController:
             summary="Running change detection on uploaded bi-temporal pair…",
             metadata={
                 "task": plan.user_intent.value,
-                "detector": "deterministic_change_detector",
+                "detector": get_upload_change_detector().name,
                 "earlier_image_id": earlier.id,
                 "later_image_id": later.id,
             },
@@ -635,7 +649,7 @@ class QueryController:
         trace.append(step)
         await asyncio.sleep(0)
         try:
-            payload = build_change_detection_input(earlier, later)
+            payload = build_change_detection_input(earlier, later, query_hint=request.query)
             output = await self._upload_detect.execute(payload)
             elapsed = int((perf_counter() - t0) * 1000)
             step.status = TraceStatus.COMPLETED
@@ -646,17 +660,48 @@ class QueryController:
             )
             step.metadata = {
                 **(step.metadata or {}),
-                "provider": "uploaded_cva",
+                "provider": "uploaded_bi_temporal",
                 "detector": output.detector,
                 "raw_detection_count": output.raw_detection_count,
                 "status": TraceStatus.COMPLETED.value,
                 "duration_ms": elapsed,
             }
+            if output.detector_metadata.get("pipeline_stages"):
+                step.metadata["pipeline_stages"] = output.detector_metadata["pipeline_stages"]
+            for key in (
+                "primary_index",
+                "histogram_confidence",
+                "confidence_kind",
+                "change_direction_hint",
+                "area_ha",
+                "changed_percentage",
+                "region_count",
+            ):
+                value = output.detector_metadata.get(key)
+                if value is not None:
+                    step.metadata[key] = value
             return output
         except Exception as exc:
             step.status = TraceStatus.FAILED
             step.completed_at = datetime.now(UTC)
-            step.error = str(exc)
+            step.duration_ms = int((perf_counter() - t0) * 1000)
+            if isinstance(exc, SatQueryError):
+                step.error = exc.message
+                step.metadata = {
+                    **(step.metadata or {}),
+                    "error_code": exc.code,
+                    "status": TraceStatus.FAILED.value,
+                    "duration_ms": step.duration_ms,
+                }
+            else:
+                step.error = str(exc)
+            from app.adapters.change.bi_temporal.errors import BiTemporalPipelineError
+
+            if isinstance(exc, BiTemporalPipelineError) and exc.pipeline_stages:
+                step.metadata = {
+                    **(step.metadata or {}),
+                    "pipeline_stages": exc.pipeline_stages,
+                }
             step.summary = "detect_change failed"
             raise
 
@@ -708,9 +753,28 @@ class QueryController:
                 "detector": output.result.detector,
                 "changed_region_count": output.result.changed_region_count,
                 "change_map_available": output.result.change_map_available,
+                "confidence_kind": output.result.confidence_kind,
                 "status": TraceStatus.COMPLETED.value,
                 "duration_ms": elapsed,
             }
+            if output.result.detector_summary:
+                summary = output.result.detector_summary
+                step.metadata.update(
+                    {
+                        "primary_index": summary.primary_index,
+                        "change_direction_hint": summary.change_direction_hint,
+                        "histogram_confidence": summary.histogram_confidence,
+                    }
+                )
+            if output.result.scene_metrics:
+                scene = output.result.scene_metrics
+                step.metadata.update(
+                    {
+                        "area_ha": scene.area_ha,
+                        "changed_percentage": scene.changed_percentage,
+                        "region_count": scene.region_count,
+                    }
+                )
             return output
         except Exception as exc:
             step.status = TraceStatus.FAILED
@@ -749,7 +813,10 @@ class QueryController:
                 query=request.query,
                 imagery=imagery,
                 fused_regions=regions,
-                fusion_metadata={"source": "uploaded_bi_temporal_cva"},
+                fusion_metadata={
+                    "source": "uploaded_bi_temporal_cva",
+                    "detector_metadata": detections.detector_metadata or {},
+                },
             )
         )
         elapsed = int((perf_counter() - t0) * 1000)
@@ -764,6 +831,11 @@ class QueryController:
             "status": TraceStatus.COMPLETED.value,
             "duration_ms": elapsed,
         }
+        detector_meta = detections.detector_metadata or {}
+        for key in ("primary_index", "histogram_confidence", "area_ha", "changed_percentage"):
+            value = detector_meta.get(key)
+            if value is not None:
+                step.metadata[key] = value
         return evidence_out
 
     async def _run_cross_modal_validation_step(

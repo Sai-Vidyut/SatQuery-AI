@@ -138,8 +138,62 @@ class AnswerEngine:
         request: QueryRequest,
         change: BiTemporalChangeResult,
     ) -> str:
+        parts: list[str] = []
+
+        if change.scene_metrics and (
+            change.scene_metrics.area_ha is not None or change.scene_metrics.area_m2 is not None
+        ):
+            if change.scene_metrics.area_ha is not None and change.scene_metrics.area_ha > 0:
+                area_text = f"Detected approximately {change.scene_metrics.area_ha:g} ha of spectral change"
+                if change.scene_metrics.changed_percentage is not None:
+                    area_text += (
+                        f", covering {change.scene_metrics.changed_percentage:g}% "
+                        "of the analyzed area"
+                    )
+                parts.append(f"{area_text}.")
+            elif change.scene_metrics.area_m2 is not None and change.scene_metrics.area_m2 > 0:
+                parts.append(
+                    f"Detected approximately {change.scene_metrics.area_m2:,.0f} m² of spectral change."
+                )
+        elif change.change_summary:
+            parts.append(change.change_summary.strip().rstrip("."))
+
+        if change.detector_summary and change.detector_summary.primary_index:
+            index_label = change.detector_summary.primary_index.upper()
+            signal_text = f"The primary signal was {index_label}"
+            hint = change.detector_summary.change_direction_hint
+            if hint and hint != "no_change":
+                from app.evidence.bi_temporal_interpretation import humanize_direction_hint
+
+                signal_text += (
+                    f", with a direction hint consistent with {humanize_direction_hint(hint)}"
+                )
+            parts.append(f"{signal_text}.")
+
+        if change.changed_region_count > 0:
+            parts.append(
+                f"{change.changed_region_count} mapped change region"
+                f"{'s' if change.changed_region_count != 1 else ''} "
+                f"between {change.earlier_date.isoformat()} and {change.later_date.isoformat()}."
+            )
+        elif not parts:
+            parts.append(change.change_summary.strip())
+
+        if change.detector_summary and change.detector_summary.histogram_confidence is not None:
+            score = change.detector_summary.histogram_confidence
+            parts.append(
+                f"Histogram separability score: {score:.2f} "
+                "(detector confidence, not model accuracy or event probability)."
+            )
+
+        if change.change_map_available:
+            parts.append("Detected regions are shown on the map.")
+
+        if not parts:
+            parts.append(change.change_summary.strip())
+
         mode_note = " [development uploaded CVA — not Earth Engine catalog]"
-        return f"{change.change_summary.strip()}{mode_note}"
+        return " ".join(parts) + mode_note
 
     def compose_cross_modal(self, request: QueryRequest, result: CrossModalOpticalSARResult) -> str:
         mode_note = " [development cross-modal pipeline — not Earth Engine catalog fusion]"

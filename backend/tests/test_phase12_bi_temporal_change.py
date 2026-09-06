@@ -16,7 +16,7 @@ from app.schemas.input import ImageFormat, ImageInput, ImageModality, ImageSourc
 from app.schemas.planning import QueryIntent
 from app.services.bi_temporal_intent import is_bi_temporal_change_query
 from app.services.planner.deterministic import build_deterministic_plan
-from tests.fixtures.rasters import write_geotiff, write_invalid_tiff, write_jpeg
+from tests.fixtures.rasters import write_bi_temporal_scene, write_geotiff, write_invalid_tiff, write_jpeg
 
 
 def _pair_request(query: str, earlier_id: str, later_id: str) -> QueryRequest:
@@ -62,14 +62,35 @@ async def _upload_geotiff(
     name: str = "scene.tif",
     acquisition_datetime: str,
     origin_lon: float = 77.59,
+    scenario: str = "vegetation_loss",
+    role: str | None = None,
 ) -> str:
     path = upload_root / name
-    write_geotiff(path, origin_lon=origin_lon)
+    if role in {"earlier", "later"}:
+        write_bi_temporal_scene(
+            path,
+            role=role,  # type: ignore[arg-type]
+            scenario=scenario,  # type: ignore[arg-type]
+            origin_lon=origin_lon,
+        )
+    else:
+        if "before" in name:
+            inferred_role = "earlier"
+        elif "after" in name or name.endswith("2.tif"):
+            inferred_role = "later"
+        else:
+            inferred_role = "earlier" if name.endswith("1.tif") else "later"
+        write_bi_temporal_scene(
+            path,
+            role=inferred_role,  # type: ignore[arg-type]
+            scenario=scenario,  # type: ignore[arg-type]
+            origin_lon=origin_lon,
+        )
     with path.open("rb") as f:
         res = await client.post(
             "/api/v1/imagery/upload",
             files={"file": (name, f, "image/tiff")},
-            data={"modality": "optical", "acquisition_datetime": acquisition_datetime},
+            data={"modality": "multispectral", "acquisition_datetime": acquisition_datetime},
         )
     assert res.status_code == 200
     return res.json()["data"]["image"]["id"]
@@ -124,8 +145,10 @@ async def test_sih_02_reversed_temporal_order_rejected(client, upload_root):
 # TEST 3 — identical dates rejected
 def test_sih_03_identical_dates_rejected():
     dt = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    earlier_id = "0" * 31 + "1"
+    later_id = "0" * 31 + "2"
     earlier = ImageInput(
-        id="a" * 32,
+        id=earlier_id,
         modality=ImageModality.OPTICAL,
         format=ImageFormat.GEOTIFF,
         filename="a.tif",
@@ -137,7 +160,7 @@ def test_sih_03_identical_dates_rejected():
         source=ImageSource.UPLOAD,
         acquisition_datetime=dt,
     )
-    later = earlier.model_copy(update={"id": "b" * 32, "filename": "b.tif"})
+    later = earlier.model_copy(update={"id": later_id, "filename": "b.tif"})
     result = validate_bi_temporal(earlier, later, require_acquisition_dates=True)
     assert result.valid is False
     assert any("acquisition" in e.lower() or "temporal" in e.lower() for e in result.errors)
@@ -213,7 +236,7 @@ def test_sih_05_incompatible_crs_warning():
 # TEST 6 — dimension mismatch warns per Phase 8
 def test_sih_06_dimension_mismatch_warns():
     earlier = ImageInput(
-        id="0" * 32,
+        id="06060606060606060606060606060606",
         modality=ImageModality.OPTICAL,
         format=ImageFormat.GEOTIFF,
         filename="a.tif",
@@ -226,7 +249,7 @@ def test_sih_06_dimension_mismatch_warns():
         acquisition_datetime=datetime(2023, 1, 1, tzinfo=timezone.utc),
     )
     later = ImageInput(
-        id="1" * 32,
+        id="07070707070707070707070707070707",
         modality=ImageModality.OPTICAL,
         format=ImageFormat.GEOTIFF,
         filename="b.tif",
@@ -260,10 +283,20 @@ def test_sih_07_change_query_routing():
 @pytest.mark.asyncio
 async def test_sih_08_built_up_change_query(client, upload_root):
     earlier_id = await _upload_geotiff(
-        client, upload_root, name="b1.tif", acquisition_datetime="2023-06-01T00:00:00+00:00"
+        client,
+        upload_root,
+        name="b1.tif",
+        acquisition_datetime="2023-06-01T00:00:00+00:00",
+        scenario="urban",
+        role="earlier",
     )
     later_id = await _upload_geotiff(
-        client, upload_root, name="b2.tif", acquisition_datetime="2024-06-01T00:00:00+00:00"
+        client,
+        upload_root,
+        name="b2.tif",
+        acquisition_datetime="2024-06-01T00:00:00+00:00",
+        scenario="urban",
+        role="later",
     )
     res = await client.post(
         "/api/v1/query/submit",

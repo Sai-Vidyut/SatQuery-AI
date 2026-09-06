@@ -12,6 +12,10 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pillow>=10.0.0",
     "tifffile>=2024.8.0",
+    "numpy>=2.0.0",
+    "rasterio>=1.3.0",
+    "opencv-python-headless>=4.8.0",
+    "shapely>=2.0.0",
 ]
 
 [project.optional-dependencies]

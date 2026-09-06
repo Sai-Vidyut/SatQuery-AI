@@ -3,9 +3,12 @@ from __future__ import annotations
 from app.adapters.change.base import ChangeDetector
 from app.adapters.change.deterministic import DeterministicChangeDetector
 from app.adapters.change.earth_engine import EarthEngineChangeDetector, EarthEngineSARChangeDetector
+from app.adapters.change.uploaded_bitemporal import UploadedBiTemporalChangeDetector
 from app.core.config import get_settings
 from app.core.errors import SatQueryError
 from app.schemas.domain import DataMode, SensorType
+
+_VALID_UPLOAD_CHANGE_DETECTORS = frozenset({"bi_temporal", "deterministic"})
 
 
 def get_change_detector(
@@ -62,3 +65,22 @@ def get_change_detector(
     if effective == "earth_engine":
         return EarthEngineChangeDetector()
     return DeterministicChangeDetector()
+
+
+def get_upload_change_detector() -> ChangeDetector:
+    """
+    Resolve change detector for uploaded bi-temporal GeoTIFF pairs.
+    Catalog development mock and Earth Engine paths are unchanged.
+    """
+    settings = get_settings()
+    mode = settings.upload_change_detector
+    if mode not in _VALID_UPLOAD_CHANGE_DETECTORS:
+        raise SatQueryError(
+            "change_detector_misconfigured",
+            "UPLOAD_CHANGE_DETECTOR must be 'bi_temporal' or 'deterministic'; "
+            f"got {mode!r}.",
+            status_code=500,
+        )
+    if mode == "deterministic":
+        return DeterministicChangeDetector()
+    return UploadedBiTemporalChangeDetector()
