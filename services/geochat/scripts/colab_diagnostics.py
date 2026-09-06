@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -124,6 +125,37 @@ def log_tail(log_path: Path = DEFAULT_LOG_PATH, n: int = 200) -> str:
         return "(log file missing)"
     lines = log_path.read_text(errors="replace").splitlines()
     return "\n".join(lines[-n:])
+
+
+def service_startup_exited(
+    *,
+    pid_path: Path = DEFAULT_PID_PATH,
+    exit_path: Path = DEFAULT_EXIT_PATH,
+    supervisor_pid: int | None = None,
+    started_at: float | None = None,
+    grace_s: float = 90.0,
+) -> bool:
+    """Return True when the supervised uvicorn process has definitively exited.
+
+    During the grace window after ``started_at``, do not treat a missing service PID
+    as a crash while the supervisor is still starting uvicorn.
+    """
+    exit_code = read_exit_code(exit_path)
+    if exit_code is not None:
+        return True
+
+    service = get_process_state(pid_path)
+    supervisor_alive = is_pid_alive(supervisor_pid) if supervisor_pid is not None else False
+
+    if service.pid is not None and not service.alive:
+        return True
+
+    if supervisor_alive or service.alive:
+        return False
+
+    if started_at is None:
+        return False
+    return (time.time() - started_at) >= grace_s
 
 
 def format_process_health_line(pid_path: Path = DEFAULT_PID_PATH) -> str:

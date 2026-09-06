@@ -35,7 +35,7 @@ def _start_background_load() -> None:
     def _run() -> None:
         try:
             ENGINE.load()
-        except ModelUnavailableError:
+        except Exception:
             logger.exception("[geochat] background model load failed")
 
     threading.Thread(target=_run, daemon=True, name="geochat-model-load").start()

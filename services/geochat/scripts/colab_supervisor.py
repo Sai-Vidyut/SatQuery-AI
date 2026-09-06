@@ -116,6 +116,10 @@ def _build_env() -> dict[str, str]:
     env.setdefault("GEOCHAT_EAGER_LOAD", "true")
     env.setdefault("GEOCHAT_SERVICE_HOST", "0.0.0.0")
     env.setdefault("GEOCHAT_SERVICE_PORT", env.get("GEOCHAT_PORT", "8000"))
+    hf_token = env.get("HF_TOKEN") or env.get("HUGGINGFACE_HUB_TOKEN")
+    if hf_token:
+        env["HF_TOKEN"] = hf_token
+        env.setdefault("HUGGINGFACE_HUB_TOKEN", hf_token)
     env.pop("GEOCHAT_SERVICE_FAKE_ENGINE", None)
     pythonpath_parts = [geochat_src, str(SERVICE_ROOT)]
     existing = env.get("PYTHONPATH", "")

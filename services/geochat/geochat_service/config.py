@@ -31,7 +31,7 @@ class ServiceConfig:
             model_id=os.environ.get("GEOCHAT_MODEL_ID", DEFAULT_MODEL_ID),
             geochat_src=os.environ.get("GEOCHAT_SRC"),
             host=os.environ.get("GEOCHAT_SERVICE_HOST", "0.0.0.0"),
-            port=int(os.environ.get("GEOCHAT_SERVICE_PORT", "8080")),
+            port=int(os.environ.get("GEOCHAT_SERVICE_PORT", os.environ.get("GEOCHAT_PORT", "8000"))),
             eager_load=os.environ.get("GEOCHAT_EAGER_LOAD", "true").lower() == "true",
             hf_token=os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN"),
             service_version=os.environ.get("GEOCHAT_SERVICE_VERSION", "0.1.0"),

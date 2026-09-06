@@ -39,3 +39,12 @@ def test_build_env_sets_geochat_src_for_uvicorn_child_when_parent_omits_export(
     env = supervisor._build_env()
     assert env["GEOCHAT_SRC"] == "/content/geochat"
     assert "/content/geochat" in env["PYTHONPATH"]
+
+
+def test_build_env_propagates_hf_token_to_uvicorn_child(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HF_TOKEN", "test-token")
+    monkeypatch.delenv("HUGGINGFACE_HUB_TOKEN", raising=False)
+    supervisor = _load_supervisor_module()
+    env = supervisor._build_env()
+    assert env["HF_TOKEN"] == "test-token"
+    assert env["HUGGINGFACE_HUB_TOKEN"] == "test-token"
