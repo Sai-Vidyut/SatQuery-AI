@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 from app.schemas.bi_temporal_change import BiTemporalChangeResult
+from app.schemas.change_domain import ChangeDomain
 from app.schemas.cross_modal import CrossModalOpticalSARResult
 from app.schemas.domain import DataMode, GenerateEvidenceOutput, QueryRequest, SensorType
 from app.schemas.imagery_policy import ImageryPolicyReport, PolicyDecision
 from app.schemas.vqa import SingleImageCaptionResult, SingleImageVQAResult, VQAProviderKind
+from app.services.change_domain import (
+    compose_domain_answer_clause,
+    domain_claim_type,
+    domain_label,
+    domain_limitation,
+    evaluate_domain_support,
+)
 from app.services.query_profiles import BUILDING_CONSTRUCTION_PROFILE
 
 
@@ -19,6 +27,7 @@ class AnswerEngine:
         *,
         analysis_profile: str | None = None,
         fusion_metadata: dict | None = None,
+        change_domain: ChangeDomain | None = None,
     ) -> str:
         cva_count = sum(
             1
@@ -50,6 +59,15 @@ class AnswerEngine:
             if mode == DataMode.DEVELOPMENT
             else ""
         )
+
+        if change_domain:
+            return self._compose_domain_catalog_answer(
+                request,
+                evidence,
+                mode,
+                change_domain=change_domain,
+                fusion_metadata=fusion_metadata,
+            )
 
         if request.sensor == SensorType.SENTINEL_1 and not multimodal_count and not candidate_count:
             count = sar_count or total
@@ -138,6 +156,8 @@ class AnswerEngine:
         self,
         request: QueryRequest,
         change: BiTemporalChangeResult,
+        *,
+        change_domain: ChangeDomain | None = None,
     ) -> str:
         parts: list[str] = []
 
@@ -193,8 +213,92 @@ class AnswerEngine:
         if not parts:
             parts.append(change.change_summary.strip())
 
+        if change_domain and change.changed_region_count > 0 and change.detector_summary:
+            strength, _ = evaluate_domain_support(
+                change_domain,
+                direction_hint=change.detector_summary.change_direction_hint,
+                primary_index=change.detector_summary.primary_index,
+            )
+            parts.append(
+                compose_domain_answer_clause(
+                    change_domain,
+                    strength=strength,
+                    direction_hint=change.detector_summary.change_direction_hint,
+                    primary_index=change.detector_summary.primary_index,
+                )
+            )
+            parts.append(domain_limitation(change_domain))
+
         mode_note = " [development uploaded CVA — not Earth Engine catalog]"
         return " ".join(parts) + mode_note
+
+    def _compose_domain_catalog_answer(
+        self,
+        request: QueryRequest,
+        evidence: GenerateEvidenceOutput,
+        mode: DataMode,
+        *,
+        change_domain: ChangeDomain,
+        fusion_metadata: dict | None = None,
+    ) -> str:
+        fusion_metadata = fusion_metadata or {}
+        detector_metadata = fusion_metadata.get("detector_metadata")
+        detector_meta = detector_metadata if isinstance(detector_metadata, dict) else {}
+        direction_hint = detector_meta.get("change_direction_hint")
+        primary_index = detector_meta.get("primary_index")
+        claim = domain_claim_type(change_domain)
+        domain_regions = [r for r in evidence.regions if r.metadata.get("claim_type") == claim]
+        spectral_count = sum(
+            1
+            for r in evidence.regions
+            if r.metadata.get("evidence_type") == "spectral_change"
+        )
+        has_semantic = any(r.metadata.get("semantic_support") for r in evidence.regions)
+        has_sar = any(r.metadata.get("evidence_modality") == "sar" for r in evidence.regions)
+        strength, _ = evaluate_domain_support(
+            change_domain,
+            direction_hint=direction_hint,
+            primary_index=primary_index,
+            has_semantic_built=has_semantic,
+            has_sar_support=has_sar,
+        )
+
+        if not evidence.regions:
+            return (
+                f"No significant change detected in the AOI for "
+                f"{request.earlier_date.isoformat()} to {request.later_date.isoformat()} "
+                f"({domain_label(change_domain)} query). "
+                f"{domain_limitation(change_domain)}"
+            )
+
+        pct = round(evidence.confidence * 100)
+        mode_note = " (development demo data)" if mode == DataMode.DEVELOPMENT else ""
+        area_ha = detector_meta.get("area_ha")
+        changed_pct = detector_meta.get("changed_percentage")
+        area_part = ""
+        if area_ha:
+            area_part = f"Detected approximately {area_ha:g} ha of spectral change"
+            if changed_pct is not None:
+                area_part += f", covering {changed_pct:g}% of the analyzed AOI"
+            area_part += ". "
+
+        domain_clause = compose_domain_answer_clause(
+            change_domain,
+            strength=strength,
+            direction_hint=direction_hint,
+            primary_index=primary_index,
+        )
+        region_part = (
+            f"{len(domain_regions)} domain candidate region{'s' if len(domain_regions) != 1 else ''} "
+            f"and {spectral_count} spectral change region"
+            f"{'s' if spectral_count != 1 else ''} mapped between "
+            f"{request.earlier_date.isoformat()} and {request.later_date.isoformat()}."
+        )
+        confidence_note = f"Mean detector confidence {pct}%."
+        return (
+            f"{area_part}{domain_clause} {region_part} {confidence_note} "
+            f"{domain_limitation(change_domain)}{mode_note}"
+        ).strip()
 
     def compose_cross_modal(self, request: QueryRequest, result: CrossModalOpticalSARResult) -> str:
         mode_note = " [development cross-modal pipeline — not Earth Engine catalog fusion]"

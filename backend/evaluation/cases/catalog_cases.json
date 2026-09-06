@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "description": "Phase 6 catalog evaluation cases for five competition change domains. All cases use Sentinel-2-era dates (>= 2015-06-23). Ground truth is not claimed unless explicitly noted.",
+  "cases": [
+    {
+      "case_id": "urban_expansion_bengaluru_east",
+      "domain": "urban_expansion",
+      "title": "Bengaluru eastern growth corridor",
+      "query": "Show urban expansion between these dates in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [77.72, 12.95],
+              [77.78, 12.95],
+              [77.78, 13.00],
+              [77.72, 13.00],
+              [77.72, 12.95]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2018-06-01",
+      "later_date": "2024-06-01",
+      "expected_change": "Built-up expansion and impervious surface increase in Bengaluru's eastern periphery.",
+      "evaluation_type": "qualitative",
+      "collection": "COPERNICUS/S2_SR_HARMONIZED",
+      "reference": "Documented metropolitan growth in Bengaluru; qualitative visual assessment against Sentinel-2 anchor scenes.",
+      "reference_url": "https://doi.org/10.5281/zenodo.10846426",
+      "ground_truth_available": false,
+      "notes": "Urban monthly Sentinel-2 benchmark (Zenodo) covers similar land-cover classes but is not wired as polygon GT here."
+    },
+    {
+      "case_id": "deforestation_amazon_rondonia",
+      "domain": "deforestation",
+      "title": "Amazon deforestation frontier (Rondônia)",
+      "query": "Show deforestation and vegetation loss in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [-61.45, -10.85],
+              [-61.40, -10.85],
+              [-61.40, -10.80],
+              [-61.45, -10.80],
+              [-61.45, -10.85]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2019-08-01",
+      "later_date": "2023-08-01",
+      "expected_change": "Forest clearing and vegetation loss patches along agricultural frontier.",
+      "evaluation_type": "qualitative",
+      "collection": "COPERNICUS/S2_SR_HARMONIZED",
+      "reference": "Amazon deforestation monitoring context (INPE PRODES); qualitative only — seasonality risk in dry-season pair.",
+      "reference_url": "http://terrabrasilis.dpi.inpe.br/app/dashboard/deforestation/biomes/legal_amazon/rates",
+      "ground_truth_available": false,
+      "notes": "Dry-season pairing reduces but does not eliminate phenology false positives."
+    },
+    {
+      "case_id": "water_shrinkage_lake_mead",
+      "domain": "water_shrinkage",
+      "title": "Lake Mead water extent reduction",
+      "query": "Show areas where the water body shrank in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [-114.92, 36.10],
+              [-114.85, 36.10],
+              [-114.85, 36.16],
+              [-114.92, 36.16],
+              [-114.92, 36.10]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2016-06-01",
+      "later_date": "2022-06-01",
+      "expected_change": "Reduced open-water extent along Lake Mead shoreline (documented drought period).",
+      "evaluation_type": "qualitative",
+      "collection": "COPERNICUS/S2_SR_HARMONIZED",
+      "reference": "US Bureau of Reclamation Lake Mead bathymetry/elevation records; qualitative shoreline change.",
+      "reference_url": "https://www.usbr.gov/lc/region/g4000/hourly/elevs.html",
+      "ground_truth_available": false,
+      "notes": "Seasonal inflow variation remains a false-positive risk even with same-month pairing."
+    },
+    {
+      "case_id": "infrastructure_dubai_south",
+      "domain": "infrastructure_development",
+      "title": "Dubai south infrastructure growth",
+      "query": "Highlight possible infrastructure development in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [55.12, 24.85],
+              [55.20, 24.85],
+              [55.20, 24.92],
+              [55.12, 24.92],
+              [55.12, 24.85]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2018-01-01",
+      "later_date": "2024-01-01",
+      "expected_change": "New transport and built infrastructure in Dubai south / Expo corridor.",
+      "evaluation_type": "qualitative",
+      "collection": "COPERNICUS/S2_SR_HARMONIZED",
+      "reference": "Documented infrastructure expansion in Dubai south; system reports built/spectral candidates only.",
+      "ground_truth_available": false,
+      "notes": "Cannot distinguish roads, ports, and general built-up without asset maps."
+    },
+    {
+      "case_id": "mining_disturbance_eu_reference",
+      "domain": "mining",
+      "title": "Open-pit mining disturbance (EU reference context)",
+      "query": "Find areas of land disturbance consistent with mining in this AOI.",
+      "aoi": {
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [12.30, 51.05],
+              [12.38, 51.05],
+              [12.38, 51.10],
+              [12.30, 51.10],
+              [12.30, 51.05]
+            ]
+          ]
+        }
+      },
+      "earlier_date": "2017-06-01",
+      "later_date": "2023-06-01",
+      "expected_change": "Surface disturbance near documented European open-cast mining activity.",
+      "evaluation_type": "qualitative",
+      "collection": "COPERNICUS/S2_SR_HARMONIZED",
+      "reference": "EuroMineNet multitemporal mining footprint benchmark (EU, Sentinel-2 2015–2024).",
+      "reference_url": "https://doi.org/10.14278/rodare.4656",
+      "ground_truth_available": false,
+      "notes": "EuroMineNet provides expert annotations but is not imported as GT in this phase; mining claims remain conservative."
+    }
+  ]
+}

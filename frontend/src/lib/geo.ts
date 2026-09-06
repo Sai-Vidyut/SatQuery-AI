@@ -55,6 +55,47 @@ export function aoiFromBbox(bbox: [number, number, number, number]): AOI {
   };
 }
 
+export function claimTypeColor(claimType: string | undefined): string {
+  switch (claimType) {
+    case "urban_expansion_candidate":
+      return "#e07b39";
+    case "vegetation_loss_candidate":
+      return "#3d8b5f";
+    case "water_shrinkage_candidate":
+      return "#3b82c4";
+    case "infrastructure_change_candidate":
+      return "#9b7bd4";
+    case "mining_change_candidate":
+      return "#a67c52";
+    case "construction_candidate":
+    case "new_built_area":
+      return "#c9a227";
+    default:
+      return "#c9a227";
+  }
+}
+
+export function claimTypeLabel(claimType: string | undefined): string | null {
+  switch (claimType) {
+    case "urban_expansion_candidate":
+      return "Urban expansion candidate";
+    case "vegetation_loss_candidate":
+      return "Vegetation loss candidate";
+    case "water_shrinkage_candidate":
+      return "Water shrinkage candidate";
+    case "infrastructure_change_candidate":
+      return "Infrastructure change candidate";
+    case "mining_change_candidate":
+      return "Mining change candidate";
+    case "construction_candidate":
+      return "Construction candidate";
+    case "new_built_area":
+      return "New built area";
+    default:
+      return null;
+  }
+}
+
 export function confidenceBand(confidence: number): string {
   if (confidence >= 0.75) return "High";
   if (confidence >= 0.45) return "Medium";

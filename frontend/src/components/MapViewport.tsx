@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import maplibregl, { type GeoJSONSource, type Map } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import type { AOI, EvidenceRegion } from "@/types/domain";
-import { aoiFromBbox, bboxFromAoi, detectionFillOpacity, normalizeBbox } from "@/lib/geo";
+import { aoiFromBbox, bboxFromAoi, claimTypeColor, detectionFillOpacity, normalizeBbox } from "@/lib/geo";
 
 const SATELLITE_STYLE = {
   version: 8 as const,
@@ -183,7 +183,7 @@ export function MapViewport({
         type: "fill",
         source: "detections",
         paint: {
-          "fill-color": "#c9a227",
+          "fill-color": ["get", "fillColor"],
           "fill-opacity": ["get", "fillOpacity"],
         },
       });
@@ -192,7 +192,7 @@ export function MapViewport({
         type: "line",
         source: "detections",
         paint: {
-          "line-color": "#c9a227",
+          "line-color": ["get", "fillColor"],
           "line-width": ["get", "lineWidth"],
         },
       });
@@ -242,6 +242,9 @@ export function MapViewport({
           type: "Feature" as const,
           properties: {
             id: r.id,
+            fillColor: claimTypeColor(
+              typeof r.metadata?.claim_type === "string" ? r.metadata.claim_type : undefined,
+            ),
             fillOpacity: detectionFillOpacity(r.confidence) + (selected ? 0.1 : 0),
             lineWidth: selected ? 2.5 : 1.5,
           },

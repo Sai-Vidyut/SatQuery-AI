@@ -13,6 +13,7 @@ from app.schemas.planning import (
     SensorRequirement,
 )
 from app.services.building_temporal_intent import is_building_temporal_query
+from app.services.change_domain import domain_uses_construction_pipeline, resolve_change_domain
 from app.services.single_image_intent import single_image_intent_from_query
 
 BUILDING_CONSTRUCTION_PROFILE = "building_construction"
@@ -84,6 +85,7 @@ def build_deterministic_plan(
         )
 
     if request.is_bi_temporal_upload:
+        change_domain = resolve_change_domain(request.query)
         return QueryAnalysisPlan(
             user_intent=QueryIntent.BI_TEMPORAL_CHANGE_VQA,
             requested_modalities=[RequestedModality.OPTICAL],
@@ -97,7 +99,11 @@ def build_deterministic_plan(
             later_date=None,
             sensor_requirement=SensorRequirement.NOT_APPLICABLE,
             aoi_required=False,
-            user_intent_summary="Route to uploaded bi-temporal change detection and interpretation.",
+            change_domain=change_domain,
+            user_intent_summary=(
+                f"Route to uploaded bi-temporal change detection and interpretation"
+                + (f" (domain: {change_domain.value})." if change_domain else ".")
+            ),
             planner=planner,  # type: ignore[arg-type]
         )
 
@@ -142,6 +148,7 @@ def build_deterministic_plan(
         )
 
     intent = _intent_from_query(request.query)
+    change_domain = resolve_change_domain(request.query)
 
     if intent == QueryIntent.BUILDING_TEMPORAL_CHANGE:
         return QueryAnalysisPlan(
@@ -172,9 +179,12 @@ def build_deterministic_plan(
             planner=planner,  # type: ignore[arg-type]
         )
 
-    if intent == QueryIntent.CONSTRUCTION:
+    if intent == QueryIntent.CONSTRUCTION or (
+        change_domain and domain_uses_construction_pipeline(change_domain)
+    ):
+        domain_note = f" (domain: {change_domain.value})" if change_domain else ""
         return QueryAnalysisPlan(
-            user_intent=intent,
+            user_intent=QueryIntent.CONSTRUCTION,
             requested_modalities=[RequestedModality.OPTICAL, RequestedModality.SEMANTIC],
             analysis_profile=AnalysisProfileName.BUILDING_CONSTRUCTION,
             required_tools=[
@@ -185,7 +195,10 @@ def build_deterministic_plan(
             earlier_date=request.earlier_date,
             later_date=request.later_date,
             sensor_requirement=SensorRequirement.SENTINEL_2,
-            user_intent_summary="Route to optical CVA and Dynamic World built semantic analysis.",
+            change_domain=change_domain,
+            user_intent_summary=(
+                f"Route to optical CVA and Dynamic World built semantic analysis{domain_note}."
+            ),
             planner=planner,  # type: ignore[arg-type]
         )
 
@@ -213,6 +226,7 @@ def build_deterministic_plan(
             planner=planner,  # type: ignore[arg-type]
         )
 
+    domain_note = f" (domain: {change_domain.value})" if change_domain else ""
     return QueryAnalysisPlan(
         user_intent=QueryIntent.SPECTRAL_CHANGE,
         requested_modalities=[RequestedModality.OPTICAL],
@@ -221,7 +235,8 @@ def build_deterministic_plan(
         earlier_date=request.earlier_date,
         later_date=request.later_date,
         sensor_requirement=SensorRequirement.SENTINEL_2,
-        user_intent_summary="Route to Sentinel-2 CVA spectral change detection.",
+        change_domain=change_domain,
+        user_intent_summary=f"Route to Sentinel-2 CVA spectral change detection{domain_note}.",
         planner=planner,  # type: ignore[arg-type]
     )
 

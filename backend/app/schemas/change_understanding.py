@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.schemas.bi_temporal_change import BiTemporalChangeResult, ChangeUnderstandingOutput
+from app.schemas.change_domain import ChangeDomain
 from app.schemas.domain import ChangeDetectionOutput
 from app.schemas.input import ImageInput
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,3 +16,4 @@ class ChangeUnderstandingToolInput(BaseModel):
     earlier: ImageInput
     later: ImageInput
     detections: ChangeDetectionOutput
+    change_domain: ChangeDomain | None = None

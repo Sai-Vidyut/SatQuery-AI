@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.schemas.change_domain import ChangeDomain
+
 PLANNER_VERSION = "1.0.0"
 
 
@@ -95,6 +97,7 @@ class QueryAnalysisPlan(BaseModel):
     )
     planner_version: str = PLANNER_VERSION
     planner: PlannerSource = "deterministic"
+    change_domain: ChangeDomain | None = None
 
     @field_validator("required_tools")
     @classmethod

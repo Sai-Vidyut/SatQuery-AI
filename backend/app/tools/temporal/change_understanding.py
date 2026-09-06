@@ -15,6 +15,12 @@ from app.evidence.bi_temporal_interpretation import (
     humanize_direction_hint,
     region_area_total_m2,
 )
+from app.schemas.change_domain import ChangeDomain
+from app.services.change_domain import (
+    compose_domain_answer_clause,
+    domain_limitation,
+    evaluate_domain_support,
+)
 from app.schemas.bi_temporal_change import (
     BiTemporalChangeProviderKind,
     BiTemporalChangeResult,
@@ -32,6 +38,7 @@ def _compose_uploaded_summary(
     detector_metadata: dict[str, Any],
     earlier_date,
     later_date,
+    change_domain: ChangeDomain | None = None,
 ) -> str:
     period = f"{earlier_date.isoformat()} to {later_date.isoformat()}"
     scene = extract_scene_metrics(detector_metadata)
@@ -83,7 +90,21 @@ def _compose_uploaded_summary(
             f" Mapped region IDs: {ids}{suffix} between {period}."
         )
 
-    return f"{area_clause}{signal_clause}{hint_clause}{region_clause}".strip()
+    body = f"{area_clause}{signal_clause}{hint_clause}{region_clause}".strip()
+    if change_domain and regions:
+        strength, _ = evaluate_domain_support(
+            change_domain,
+            direction_hint=direction_hint,
+            primary_index=primary_index,
+        )
+        domain_clause = compose_domain_answer_clause(
+            change_domain,
+            strength=strength,
+            direction_hint=direction_hint,
+            primary_index=primary_index,
+        )
+        body = f"{body} {domain_clause} {domain_limitation(change_domain)}"
+    return body
 
 
 def _compose_deterministic_summary(
@@ -168,6 +189,7 @@ class ChangeUnderstandingTool:
                 detector_metadata=detector_metadata,
                 earlier_date=earlier_dt.date(),
                 later_date=later_dt.date(),
+                change_domain=payload.change_domain,
             )
         else:
             summary = _compose_deterministic_summary(

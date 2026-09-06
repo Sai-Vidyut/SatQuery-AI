@@ -2,6 +2,7 @@
 
 import type { AnalysisResult, EvidenceRegion } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { claimTypeLabel } from "@/lib/geo";
 import { ExecutionTrace } from "./ExecutionTrace";
 
 type Props = {
@@ -21,8 +22,11 @@ function modalityLabel(region: EvidenceRegion): string {
 
 function claimLabel(region: EvidenceRegion): string {
   const claim = region.metadata?.claim_type;
-  if (typeof claim === "string" && claim !== "none") return claim.replace(/_/g, " ");
-  return "spectral change";
+  if (typeof claim === "string") {
+    const label = claimTypeLabel(claim);
+    if (label) return label;
+  }
+  return "Spectral change";
 }
 
 export function EvidenceInspector({
@@ -263,7 +267,9 @@ export function EvidenceInspector({
                   >
                     <span>{region.id}</span>
                     <span className="inspector-region-row__pct">
-                      {Math.round(region.confidence * 100)}%
+                      {typeof region.metadata?.significance_score === "number"
+                        ? `sig ${region.metadata.significance_score}`
+                        : `${Math.round(region.confidence * 100)}%`}
                     </span>
                   </button>
                 </li>
@@ -297,6 +303,18 @@ export function EvidenceInspector({
                 <dt>Claim</dt>
                 <dd>{claimLabel(selectedRegion)}</dd>
               </div>
+              {typeof selectedRegion.metadata?.significance_score === "number" ? (
+                <div className="inspector-metric-row">
+                  <dt>Significance</dt>
+                  <dd>{selectedRegion.metadata.significance_score}</dd>
+                </div>
+              ) : null}
+              {typeof selectedRegion.metadata?.claim_strength === "string" ? (
+                <div className="inspector-metric-row">
+                  <dt>Claim strength</dt>
+                  <dd>{selectedRegion.metadata.claim_strength}</dd>
+                </div>
+              ) : null}
               {selectedRegion.metrics.map((m) => (
                 <div key={m.name} className="inspector-metric-row">
                   <dt>{m.name}</dt>

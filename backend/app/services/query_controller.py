@@ -49,6 +49,7 @@ from app.services.answer_engine import AnswerEngine
 from app.services.planner.service import plan_query
 from app.services.session_store import SessionStore, session_store
 from app.services.temporal_imagery_resolver import TemporalImageryResolver
+from app.services.change_domain import annotate_regions_for_domain, domain_metrics_from_regions
 from app.schemas.cross_modal import (
     CrossModalFusionInput,
     OpticalAnalysisInput,
@@ -264,6 +265,13 @@ class QueryController:
                 )
                 for r in detections.regions
             ]
+            if plan.change_domain:
+                regions = annotate_regions_for_domain(
+                    regions,
+                    plan.change_domain,
+                    direction_hint=detector_meta.get("change_direction_hint"),
+                    primary_index=detector_meta.get("primary_index"),
+                )
             understanding = await self._run_change_understanding_step(
                 trace, request, earlier, later, detections, plan
             )
@@ -276,7 +284,11 @@ class QueryController:
                 later=later,
             )
 
-            answer = self._answer.compose_bi_temporal_change(request, understanding.result)
+            answer = self._answer.compose_bi_temporal_change(
+                request,
+                understanding.result,
+                change_domain=plan.change_domain,
+            )
             confidence = (
                 understanding.result.confidence
                 if understanding.result.confidence_available
@@ -290,6 +302,16 @@ class QueryController:
             merged_metrics = evidence_out.metrics + [
                 metric for metric in detector_metrics if metric.name not in existing_metric_names
             ]
+            if plan.change_domain:
+                domain_metrics = domain_metrics_from_regions(
+                    plan.change_domain,
+                    evidence_out.regions,
+                    detector_meta,
+                )
+                existing_metric_names = {metric.name for metric in merged_metrics}
+                merged_metrics.extend(
+                    metric for metric in domain_metrics if metric.name not in existing_metric_names
+                )
             result = AnalysisResult(
                 status=AnalysisStatus.COMPLETED,
                 session_id=session_id,
@@ -450,6 +472,20 @@ class QueryController:
                 self._generate_evidence(request, imagery_out, fused_out),
             )
 
+            evidence_regions = list(evidence_out.regions)
+            if plan.change_domain:
+                semantic_regions = semantic_out.regions if semantic_out else []
+                sar_regions = sar_detections.regions if sar_detections else []
+                evidence_regions = annotate_regions_for_domain(
+                    evidence_regions,
+                    plan.change_domain,
+                    direction_hint=(detections.detector_metadata or {}).get("change_direction_hint"),
+                    primary_index=(detections.detector_metadata or {}).get("primary_index"),
+                    has_semantic_built=bool(semantic_regions),
+                    has_sar_support=bool(sar_regions),
+                )
+                evidence_out = evidence_out.model_copy(update={"regions": evidence_regions})
+
             metrics = self._evidence.aggregate_metrics(
                 evidence_out.metrics,
                 cva_detections if request.sensor != SensorType.SENTINEL_1 else detections,
@@ -463,6 +499,7 @@ class QueryController:
                 imagery_out.result.mode,
                 analysis_profile=plan.profile,
                 fusion_metadata=fused_out.fusion_metadata,
+                change_domain=plan.change_domain,
             )
 
             result = AnalysisResult(
@@ -631,6 +668,7 @@ class QueryController:
             step.metadata = {
                 "planner": plan_output.planner,
                 "intent": plan.user_intent.value,
+                "change_domain": plan.change_domain.value if plan.change_domain else None,
                 "required_tools": [t.value for t in plan.required_tools],
                 "requested_modalities": [m.value for m in plan.requested_modalities],
                 "planner_version": plan.planner_version,
@@ -846,6 +884,7 @@ class QueryController:
                     earlier=earlier,
                     later=later,
                     detections=detections,
+                    change_domain=plan.change_domain,
                 )
             )
             elapsed = int((perf_counter() - t0) * 1000)
@@ -1433,6 +1472,9 @@ class QueryController:
             step.completed_at = datetime.now(UTC)
             step.duration_ms = elapsed
             step.summary = self._summarize(tool_name, output)
+            meta = self._step_metadata(tool_name, output)
+            if meta:
+                step.metadata = meta
             return output
         except Exception as exc:
             step.status = TraceStatus.FAILED
@@ -1465,6 +1507,38 @@ class QueryController:
         if tool_name == "change_understanding":
             return f"Change understanding via {output.result.detector}"
         return f"{tool_name} completed"
+
+    def _step_metadata(self, tool_name: str, output) -> dict[str, object] | None:
+        if tool_name == "fetch_imagery":
+            result = output.result
+            return {
+                "provider": result.source,
+                "data_mode": result.mode.value,
+                "sensor": result.sensor.value,
+                "scene_count": len(result.scenes),
+                "scenes": [
+                    {
+                        "scene_id": scene.scene_id,
+                        "acquisition_date": scene.acquisition_date.isoformat(),
+                        "platform_id": scene.platform_id,
+                        "cloud_cover_percent": scene.cloud_cover_percent,
+                    }
+                    for scene in result.scenes
+                ],
+                "selection_policy": (result.provider_metadata or {}).get("selection_policy"),
+            }
+        if tool_name == "detect_change":
+            metadata = output.detector_metadata or {}
+            return {
+                "detector": output.detector,
+                "data_mode": output.mode.value,
+                "raw_detection_count": output.raw_detection_count,
+                "region_count": len(output.regions),
+                "detector_version": metadata.get("detector_version"),
+                "method": metadata.get("method"),
+                "threshold": metadata.get("threshold"),
+            }
+        return None
 
     async def _fetch_imagery(self, request: QueryRequest, plan: QueryAnalysisPlan):
         if plan.sensor_requirement == SensorRequirement.SENTINEL_1:
