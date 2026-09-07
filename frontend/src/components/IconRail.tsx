@@ -12,7 +12,7 @@ export function IconRail({ drawMode, onToggleDraw, onTogglePan }: Props) {
   return (
     <nav
       data-testid="rail"
-      className="chrome-rail absolute left-3 top-3 z-20 flex flex-col items-center pb-2"
+      className="chrome-rail glass-light absolute left-3 top-3 z-20 flex flex-col items-center pb-2"
       aria-label="Main navigation"
     >
       <div className="chrome-rail__brand">
@@ -26,6 +26,7 @@ export function IconRail({ drawMode, onToggleDraw, onTogglePan }: Props) {
         type="button"
         className={`chrome-btn${drawMode ? " chrome-btn--active" : ""}`}
         data-testid="rail-draw-aoi"
+        data-tour="rail-draw-aoi"
         aria-label={drawMode ? "Drawing AOI — drag on map to draw a rectangle" : "Draw AOI"}
         aria-pressed={drawMode}
         title="Draw AOI"

@@ -135,7 +135,7 @@ export function EvidenceInspector({
   return (
     <aside
       data-testid="inspector"
-      className="inspector-panel absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-var(--composer-offset))] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
+      className="inspector-panel glass-light absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-var(--composer-offset))] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
       style={{ zIndex: 25 }}
     >
       <header className="inspector-header">

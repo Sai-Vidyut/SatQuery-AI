@@ -93,8 +93,8 @@ export function QueryComposer({
     <div className="composer-wrap">
       {statusLine ? <p className="composer-status">{statusLine}</p> : null}
 
-      <div data-testid="composer" className="glass composer-shell">
-        <div className="composer-mode-row">
+      <div data-testid="composer" className="glass-light composer-shell">
+        <div className="composer-mode-row" data-tour="composer-mode-row">
           <button
             type="button"
             className={`btn-secondary ${inputMode === "catalog" ? "btn-secondary--active" : ""}`}
@@ -155,6 +155,7 @@ export function QueryComposer({
                   type="button"
                   className="composer-upload-btn"
                   data-testid="composer-upload-optical-trigger"
+                  data-tour="composer-upload-optical"
                   onClick={() => opticalFileRef.current?.click()}
                 >
                   <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
@@ -187,6 +188,7 @@ export function QueryComposer({
                   type="button"
                   className="composer-upload-btn"
                   data-testid="composer-upload-sar-trigger"
+                  data-tour="composer-upload-sar"
                   onClick={() => sarFileRef.current?.click()}
                 >
                   <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
@@ -227,6 +229,7 @@ export function QueryComposer({
                   type="button"
                   className="composer-upload-btn"
                   data-testid="composer-upload-earlier-trigger"
+                  data-tour="composer-upload-earlier"
                   onClick={() => earlierFileRef.current?.click()}
                 >
                   <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
@@ -259,6 +262,7 @@ export function QueryComposer({
                   type="button"
                   className="composer-upload-btn"
                   data-testid="composer-upload-later-trigger"
+                  data-tour="composer-upload-later"
                   onClick={() => laterFileRef.current?.click()}
                 >
                   <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
@@ -326,6 +330,7 @@ export function QueryComposer({
                 type="button"
                 className="composer-upload-btn"
                 data-testid="composer-upload-trigger"
+                data-tour="composer-upload-single"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
@@ -408,6 +413,7 @@ export function QueryComposer({
             <input
               id="composer-query"
               data-testid="composer-query"
+              data-tour="composer-query"
               type="text"
               className="input-field input-field--query w-full"
               placeholder={
@@ -432,6 +438,7 @@ export function QueryComposer({
             <button
               type="submit"
               data-testid="composer-run"
+              data-tour="composer-run"
               className="btn-primary"
               disabled={running}
               aria-busy={running}

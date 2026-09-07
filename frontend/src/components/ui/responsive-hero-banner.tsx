@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { HomeHeroLogo } from "@/components/home/HomeHeroLogo";
 
 export type ResponsiveHeroBannerProps = {
   backgroundImageUrl?: string;
@@ -50,10 +51,13 @@ export function ResponsiveHeroBanner({
         aria-hidden="true"
       />
       <div className="responsive-hero-banner__overlay" aria-hidden="true" />
+      <div className="responsive-hero-banner__fade-bottom" aria-hidden="true" />
+
+      <HomeHeroLogo />
 
       <div className="responsive-hero-banner__content">
         {badgeText ? (
-          <div className="responsive-hero-banner__badge hero-animate hero-animate--1">
+          <div className="responsive-hero-banner__badge glass hero-animate hero-animate--1">
             {badgeLabel ? (
               <span className="responsive-hero-banner__badge-label">{badgeLabel}</span>
             ) : null}
@@ -80,7 +84,7 @@ export function ResponsiveHeroBanner({
         <div className="responsive-hero-banner__actions hero-animate hero-animate--5">
           <Link
             href={primaryButtonHref}
-            className="btn-primary responsive-hero-banner__cta"
+            className="responsive-hero-banner__cta"
           >
             {primaryButtonText}
           </Link>
