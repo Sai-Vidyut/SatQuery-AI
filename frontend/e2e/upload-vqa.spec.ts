@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 const FIXTURE_DIR = path.join(__dirname, "fixtures");
 const FIXTURE_TIF = path.join(FIXTURE_DIR, "vqa_smoke.tif");

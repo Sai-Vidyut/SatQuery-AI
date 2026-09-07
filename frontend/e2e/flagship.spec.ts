@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 async function drawAoiOnMap(page: import("@playwright/test").Page) {
   await page.getByTestId("rail-draw-aoi").click();
