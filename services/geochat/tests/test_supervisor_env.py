@@ -48,3 +48,12 @@ def test_build_env_propagates_hf_token_to_uvicorn_child(monkeypatch: pytest.Monk
     env = supervisor._build_env()
     assert env["HF_TOKEN"] == "test-token"
     assert env["HUGGINGFACE_HUB_TOKEN"] == "test-token"
+
+
+def test_build_env_sets_colab_memory_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GEOCHAT_COLAB_MEMORY_PROFILE", raising=False)
+    monkeypatch.delenv("GEOCHAT_OFFLOAD_DIR", raising=False)
+    supervisor = _load_supervisor_module()
+    env = supervisor._build_env()
+    assert env["GEOCHAT_COLAB_MEMORY_PROFILE"] == "colab"
+    assert env["GEOCHAT_OFFLOAD_DIR"] == "/content/geochat_offload"

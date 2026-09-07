@@ -116,6 +116,9 @@ def _build_env() -> dict[str, str]:
     env.setdefault("GEOCHAT_EAGER_LOAD", "true")
     env.setdefault("GEOCHAT_SERVICE_HOST", "0.0.0.0")
     env.setdefault("GEOCHAT_SERVICE_PORT", env.get("GEOCHAT_PORT", "8000"))
+    env.setdefault("GEOCHAT_COLAB_MEMORY_PROFILE", "colab")
+    env.setdefault("GEOCHAT_OFFLOAD_DIR", "/content/geochat_offload")
+    env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     hf_token = env.get("HF_TOKEN") or env.get("HUGGINGFACE_HUB_TOKEN")
     if hf_token:
         env["HF_TOKEN"] = hf_token

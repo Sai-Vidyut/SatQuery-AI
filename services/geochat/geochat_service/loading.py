@@ -20,28 +20,84 @@ PHASE9B_LOAD_KWARGS = {
 }
 
 
+def _colab_memory_profile_enabled() -> bool:
+    """True when Colab low-RAM safeguards should apply."""
+    import os
+
+    profile = os.environ.get("GEOCHAT_COLAB_MEMORY_PROFILE", "").lower()
+    if profile in {"1", "true", "colab"}:
+        return True
+    if profile in {"0", "false", "off"}:
+        return False
+    # Belt-and-suspenders: auto-enable on Colab /content even if CELL 5 omitted the env var.
+    return Path("/content").is_dir()
+
+
 def _resolve_load_max_memory() -> dict | None:
     """Optional accelerate max_memory caps — critical on Colab ~12 GB system RAM."""
     import os
 
-    import torch
-
     gpu_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_GPU")
     cpu_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_CPU")
-    if gpu_limit or cpu_limit:
+    disk_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_DISK")
+    if gpu_limit or cpu_limit or disk_limit:
         out: dict = {}
-        if gpu_limit and torch.cuda.is_available():
-            out[0] = gpu_limit
+        if gpu_limit:
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    out[0] = gpu_limit
+            except ImportError:
+                out[0] = gpu_limit
         if cpu_limit:
             out["cpu"] = cpu_limit
+        if disk_limit:
+            out["disk"] = disk_limit
         return out or None
 
-    profile = os.environ.get("GEOCHAT_COLAB_MEMORY_PROFILE", "").lower()
-    if profile in {"1", "true", "colab"} and torch.cuda.is_available():
-        props = torch.cuda.get_device_properties(torch.cuda.current_device())
-        gpu_gib = max(10, int(props.total_memory / (1024**3) * 0.88))
-        return {0: f"{gpu_gib}GiB", "cpu": "4GiB"}
+    if _colab_memory_profile_enabled():
+        gpu_cap = "12GiB"
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                props = torch.cuda.get_device_properties(torch.cuda.current_device())
+                gpu_gib = max(10, int(props.total_memory / (1024**3) * 0.85))
+                gpu_cap = f"{gpu_gib}GiB"
+        except ImportError:
+            pass
+        # Tight CPU cap + disk spillover avoids Colab ~12 GB RAM OOM during shard load.
+        return {0: gpu_cap, "cpu": "2GiB", "disk": "40GiB"}
     return None
+
+
+def _resolve_offload_folder() -> Path | None:
+    import os
+
+    if not _colab_memory_profile_enabled():
+        return None
+    folder = Path(os.environ.get("GEOCHAT_OFFLOAD_DIR", "/content/geochat_offload"))
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def _trim_process_memory() -> None:
+    """Best-effort RAM release before the heavy checkpoint load."""
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+    try:
+        import ctypes
+
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass
 
 
 def _checkpoint(message: str) -> None:
@@ -110,8 +166,7 @@ def load_geochat_runtime(
 
     from geochat.model.language_model.geochat_llama import GeoChatLlamaForCausalLM
 
-    gc.collect()
-    torch.cuda.empty_cache()
+    _trim_process_memory()
 
     _checkpoint("loading tokenizer")
     tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=False)
@@ -122,6 +177,10 @@ def load_geochat_runtime(
     if max_memory:
         load_kwargs["max_memory"] = max_memory
         _checkpoint(f"max_memory caps: {max_memory}")
+    offload_folder = _resolve_offload_folder()
+    if offload_folder is not None:
+        load_kwargs["offload_folder"] = str(offload_folder)
+        _checkpoint(f"offload_folder: {offload_folder}")
     _checkpoint(
         "load kwargs: "
         f"device_map={load_kwargs['device_map']!r}, "
