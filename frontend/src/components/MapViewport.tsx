@@ -157,11 +157,6 @@ export function MapViewport({
       console.error("[map]", event.error?.message ?? event);
     });
 
-    map.addControl(
-      new maplibregl.AttributionControl({ compact: true }),
-      "bottom-left",
-    );
-
     map.on("load", () => {
       try {
         addLabelsOverlay(map);

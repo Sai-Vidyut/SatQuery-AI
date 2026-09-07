@@ -1,5 +1,5 @@
-import { SitePageShell } from "@/components/SitePageShell";
+import { ResponsiveHeroBanner } from "@/components/ui/responsive-hero-banner";
 
 export default function HomePage() {
-  return <SitePageShell title="SatQuery AI" />;
+  return <ResponsiveHeroBanner />;
 }

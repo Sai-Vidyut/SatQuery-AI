@@ -505,16 +505,6 @@ export function Workspace() {
         />
       </div>
 
-      {!aoi && inputMode === "catalog" ? (
-        <div
-          className="map-hint absolute bottom-[var(--composer-offset)] left-14 z-10"
-          data-testid="empty-hint"
-          role="status"
-        >
-          Draw an area to begin
-        </div>
-      ) : null}
-
       <IconRail
         drawMode={drawMode}
         onToggleDraw={() => setDrawMode(true)}

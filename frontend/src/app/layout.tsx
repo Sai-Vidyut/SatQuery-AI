@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Instrument_Serif } from "next/font/google";
 import { GlobalNav } from "@/components/GlobalNav";
 import "./globals.css";
 
@@ -10,6 +10,13 @@ const inter = Inter({
   display: "swap",
 });
 
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "SatQuery AI",
   description: "Evidence-driven satellite intelligence workstation",
@@ -17,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${instrumentSerif.variable}`}>
       <body>
         <GlobalNav />
         {children}

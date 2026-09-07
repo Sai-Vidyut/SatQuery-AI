@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -30,6 +31,7 @@ export function GlobalNav() {
   const menuId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [overDarkHero, setOverDarkHero] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen((value) => !value), []);
@@ -37,6 +39,32 @@ export function GlobalNav() {
   useEffect(() => {
     close();
   }, [pathname, close]);
+
+  useEffect(() => {
+    if (pathname !== "/home") {
+      setOverDarkHero(false);
+      return;
+    }
+
+    const hero = document.getElementById("home-hero");
+    if (!hero) {
+      setOverDarkHero(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setOverDarkHero(entry.isIntersecting && entry.intersectionRatio > 0.35);
+      },
+      {
+        threshold: [0, 0.35, 0.6],
+        rootMargin: "-72px 0px 0px 0px",
+      },
+    );
+
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,8 +87,10 @@ export function GlobalNav() {
     };
   }, [open, close]);
 
-  return (
-    <div ref={rootRef} className="site-nav">
+  const isWorkstation = pathname === "/";
+
+  const navMenu = (
+    <>
       <button
         type="button"
         className="site-nav__trigger"
@@ -105,6 +135,37 @@ export function GlobalNav() {
           </ul>
         </nav>
       </div>
-    </div>
+    </>
+  );
+
+  if (isWorkstation) {
+    return (
+      <div ref={rootRef} className="site-nav site-nav--standalone">
+        {navMenu}
+      </div>
+    );
+  }
+
+  return (
+    <header
+      className={`site-nav-bar${overDarkHero ? " site-nav-bar--inverse" : ""}`}
+    >
+      <div className="site-nav-bar__pill">
+        <Link href="/home" className="site-nav-bar__brand" data-testid="site-nav-brand">
+          <Image
+            src="/LOGO.png"
+            alt="SatQuery"
+            width={1340}
+            height={343}
+            className="site-nav-bar__logo"
+            priority
+          />
+        </Link>
+
+        <div ref={rootRef} className="site-nav">
+          {navMenu}
+        </div>
+      </div>
+    </header>
   );
 }
