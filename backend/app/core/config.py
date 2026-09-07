@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     upload_dir: str = "data/uploads"
     max_upload_size_mb: int = 256
+    upload_allow_png_jpeg_without_benchmark: bool = False
     geochat_vqa_provider: str = "development"  # development | geochat_service
     geochat_service_url: str | None = None
     geochat_model_id: str = "MBZUAI/geochat-7B"

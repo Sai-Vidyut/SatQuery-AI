@@ -13,6 +13,7 @@ from app.schemas.input import (
     SingleImageAnalysisInput,
 )
 from app.storage.factory import get_metadata_registry
+from app.adapters.imagery.uploaded.validation import png_jpeg_upload_permitted
 
 _DIM_TOLERANCE = 0.05  # 5% relative dimension mismatch tolerance
 _MIN_OVERLAP_FRACTION = 0.5
@@ -66,7 +67,9 @@ def validate_single_image(image: ImageInput) -> InputValidationResult:
         )
     )
 
-    if image.format.value in {"png", "jpeg"} and not image.benchmark_dataset:
+    if image.format.value in {"png", "jpeg"} and not png_jpeg_upload_permitted(
+        benchmark_dataset=image.benchmark_dataset
+    ):
         checks.append(
             InputValidationCheck(
                 check="benchmark_dataset",

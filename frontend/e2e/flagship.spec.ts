@@ -53,7 +53,7 @@ test.describe("SatQuery flagship flow", () => {
     expect(await regions.count()).toBeGreaterThanOrEqual(1);
 
     await expect(inspector.getByText(/Regions \(\d+\)/)).toBeVisible();
-    await expect(page.locator(".inspector-answer")).toContainText(/confidence/i);
+    await expect(page.locator(".inspector-answer")).toContainText(/separability/i);
     await expect(page.getByTestId("map")).toBeVisible();
   });
 

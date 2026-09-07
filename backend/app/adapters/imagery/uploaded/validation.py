@@ -24,6 +24,13 @@ _RASTER_FORMATS = {ImageFormat.GEOTIFF, ImageFormat.TIFF}
 _BENCHMARK_FORMATS = {ImageFormat.PNG, ImageFormat.JPEG}
 
 
+def png_jpeg_upload_permitted(*, benchmark_dataset: bool) -> bool:
+    """PNG/JPEG is allowed when benchmark_dataset=true or local demo upload flag is set."""
+    if benchmark_dataset:
+        return True
+    return get_settings().upload_allow_png_jpeg_without_benchmark
+
+
 def sanitize_filename(name: str) -> str:
     base = Path(name).name
     cleaned = _SAFE_FILENAME.sub("_", base).strip("._")
@@ -63,7 +70,7 @@ def validate_extension_and_format(
             message="Unsupported file extension. Allowed: GeoTIFF, TIFF, PNG, JPEG.",
             status_code=400,
         )
-    if fmt in _BENCHMARK_FORMATS and not benchmark_dataset:
+    if fmt in _BENCHMARK_FORMATS and not png_jpeg_upload_permitted(benchmark_dataset=benchmark_dataset):
         raise SatQueryError(
             code="benchmark_required",
             message="PNG/JPEG uploads require benchmark_dataset=true.",
