@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
+import { SolarLoader } from "@/components/ui/solar-loader";
 import type { ImageInput } from "@/types/domain";
 
 export type ComposerInputMode = "catalog" | "upload" | "temporal_pair" | "cross_modal";
@@ -418,12 +419,12 @@ export function QueryComposer({
               className="input-field input-field--query w-full"
               placeholder={
                 isCrossModal
-                  ? "Use the optical and SAR images together to identify built-up and water-covered regions."
+                  ? "Ask a question using the optical and SAR images together…"
                   : isTemporalPair
-                    ? "What changed between these two dates, and where did the change occur?"
+                    ? "Ask what changed between these two dates…"
                     : isUpload
-                      ? "Describe the land-cover and major objects visible…"
-                      : "Show significant new construction…"
+                      ? "Ask a question about this image…"
+                      : "Ask a question about this area…"
               }
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
@@ -445,7 +446,9 @@ export function QueryComposer({
             >
               {running ? (
                 <>
-                  <span className="btn-spinner" aria-hidden />
+                  <span className="solar-loader-host solar-loader-host--button" aria-hidden="true">
+                    <SolarLoader size={20} speed={2} />
+                  </span>
                   Running…
                 </>
               ) : (

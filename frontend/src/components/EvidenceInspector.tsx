@@ -2,6 +2,7 @@
 
 import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { SolarLoader } from "@/components/ui/solar-loader";
 import { claimTypeLabel } from "@/lib/geo";
 import { isFetchImageryMetadata } from "@/lib/trace";
 import { ExecutionTrace } from "./ExecutionTrace";
@@ -146,6 +147,15 @@ export function EvidenceInspector({
       </header>
 
       <ExecutionTrace steps={result?.trace ?? []} loading={running} />
+
+      {running && !result ? (
+        <div className="inspector-section inspector-loading" data-testid="inspector-loading">
+          <div className="inspector-loading__visual">
+            <SolarLoader size={28} speed={1.5} />
+          </div>
+          <p className="inspector-loading__label">Running analysis…</p>
+        </div>
+      ) : null}
 
       {analysisError && !running ? (
         <div className="inspector-section" role="alert" data-testid="inspector-analysis-error">

@@ -8,12 +8,11 @@ export default function CreditsPage() {
           <p className="credits-page__eyebrow">SatQuery</p>
           <h1 className="credits-page__title">Built by Team SatQuery</h1>
           <p className="credits-page__intro">
-            SatQuery AI is an evidence-driven satellite intelligence platform, built for Smart
-            India Hackathon 2026 by a three-person team from SRMIST.
+            SatQuery AI is an evidence-driven satellite intelligence platform — an independent
+            project built by a three-person team from SRMIST.
           </p>
           <p className="credits-page__status">
-            SatQuery AI is under active development as part of SIH 2026. Some features may be in
-            demo mode.
+            SatQuery AI is under active development. Some features may be in demo mode.
           </p>
         </div>
       </section>
@@ -36,11 +35,11 @@ export default function CreditsPage() {
           <p className="credits-page__about-body">
             SatQuery is a map-first workstation where you draw an area, ask a question in plain
             language, and read evidence-backed answers on the map — with a transparent analysis
-            trace alongside the view. It was built for Smart India Hackathon 2026.
+            trace alongside the view.
           </p>
           <p className="credits-page__disclaimer">
-            SatQuery AI is an independent student project built for Smart India Hackathon 2026 and
-            is not officially affiliated with or endorsed by SRMIST.
+            SatQuery AI is an independent student project and is not officially affiliated with,
+            endorsed by, or maintained by SRMIST.
           </p>
         </div>
       </section>
