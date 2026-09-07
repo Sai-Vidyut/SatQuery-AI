@@ -145,8 +145,8 @@ GEOCHAT_REAL_SERVICE_TEST=true GEOCHAT_SERVICE_URL=https://<your-tunnel-host> \
 | `GEOCHAT_SRC` | `/content/geochat` | GeoChat upstream clone path |
 | `GEOCHAT_MODEL_ID` | `MBZUAI/geochat-7B` | Hugging Face model id |
 | `GEOCHAT_EAGER_LOAD` | `true` | Load model when service starts |
-| `GEOCHAT_COLAB_MEMORY_PROFILE` | `colab` | Enables cpu=2GiB + disk=40GiB offload caps |
-| `GEOCHAT_OFFLOAD_DIR` | `/content/geochat_offload` | Disk spillover during 8-bit load |
+| `GEOCHAT_COLAB_MEMORY_PROFILE` | `colab` | Enables cpu=2GiB cap + offload_folder spillover |
+| `GEOCHAT_OFFLOAD_DIR` | `/content/geochat_offload` | Disk spillover during 8-bit load (not max_memory disk) |
 | `GEOCHAT_SERVICE_HOST` | `0.0.0.0` | Bind address |
 | `HF_TOKEN` | — | Hugging Face auth (Colab Secret) |
 
@@ -163,7 +163,7 @@ Production GPU hosts may still use port **8080** via `GEOCHAT_SERVICE_URL` — t
 | `CUDA GPU is unavailable` | Runtime → T4 GPU, restart runtime |
 | `bitsandbytes` CUDA error | Restart runtime; re-run launcher |
 | `model_loaded: false` in `/health` | Wait for HF download; check `HF_TOKEN` |
-| `exit_code: -9` during CELL 6 | **OOM** — use **High-RAM** runtime, or pull latest `sai/core-ai` (disk offload). Log must show `cpu: 2GiB`, `disk: 40GiB` |
+| `exit_code: -9` during CELL 6 | **OOM** — use **High-RAM** runtime, or pull latest `sai/core-ai` (offload_folder). Log must show `{0: '12GiB', 'cpu': '2GiB'}` |
 | Tunnel connects but health fails | Ensure uvicorn is listening on **8000** |
 
 ### OOM alternatives (exit -9)
@@ -171,7 +171,7 @@ Production GPU hosts may still use port **8080** via `GEOCHAT_SERVICE_URL` — t
 | Option | Notes |
 |--------|--------|
 | **Colab High-RAM** | Best fix — Runtime → Change runtime type → High-RAM |
-| **Disk offload (built-in)** | `GEOCHAT_COLAB_MEMORY_PROFILE=colab` spills weights to `/content/geochat_offload` |
+| **Disk offload (built-in)** | `offload_folder` at `/content/geochat_offload` + tight CPU cap |
 | **Kaggle Notebooks** | ~30 GB RAM + free GPU; same `services/geochat` launcher |
 | **Local GPU** | Run `services/geochat` on a machine with ≥16 GB system RAM + T4-class VRAM |
 | **Development mock** | On Mac: `GEOCHAT_VQA_PROVIDER=development` (no real GeoChat inference) |

@@ -33,42 +33,47 @@ def _colab_memory_profile_enabled() -> bool:
     return Path("/content").is_dir()
 
 
+def _default_gpu_memory_cap() -> str:
+    """VRAM cap for device_map=auto (T4 Colab default ~12GiB)."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(torch.cuda.current_device())
+            gpu_gib = max(10, int(props.total_memory / (1024**3) * 0.85))
+            return f"{gpu_gib}GiB"
+    except ImportError:
+        pass
+    return "12GiB"
+
+
 def _resolve_load_max_memory() -> dict | None:
-    """Optional accelerate max_memory caps — critical on Colab ~12 GB system RAM."""
+    """Optional accelerate max_memory caps — critical on Colab ~12 GB system RAM.
+
+    Note: do NOT put ``disk`` in max_memory — pinned transformers/accelerate call
+    ``torch.device("disk")`` and fail. Use ``offload_folder`` for disk spillover.
+    """
     import os
 
     gpu_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_GPU")
     cpu_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_CPU")
-    disk_limit = os.environ.get("GEOCHAT_LOAD_MAX_MEMORY_DISK")
-    if gpu_limit or cpu_limit or disk_limit:
+    if gpu_limit or cpu_limit:
         out: dict = {}
-        if gpu_limit:
-            try:
-                import torch
-
-                if torch.cuda.is_available():
-                    out[0] = gpu_limit
-            except ImportError:
-                out[0] = gpu_limit
-        if cpu_limit:
-            out["cpu"] = cpu_limit
-        if disk_limit:
-            out["disk"] = disk_limit
-        return out or None
-
-    if _colab_memory_profile_enabled():
-        gpu_cap = "12GiB"
+        gpu_cap = gpu_limit or _default_gpu_memory_cap()
         try:
             import torch
 
             if torch.cuda.is_available():
-                props = torch.cuda.get_device_properties(torch.cuda.current_device())
-                gpu_gib = max(10, int(props.total_memory / (1024**3) * 0.85))
-                gpu_cap = f"{gpu_gib}GiB"
+                out[0] = gpu_cap
         except ImportError:
-            pass
-        # Tight CPU cap + disk spillover avoids Colab ~12 GB RAM OOM during shard load.
-        return {0: gpu_cap, "cpu": "2GiB", "disk": "40GiB"}
+            out[0] = gpu_cap
+        if cpu_limit:
+            out["cpu"] = cpu_limit
+        return out or None
+
+    if _colab_memory_profile_enabled():
+        # Tight CPU cap; offload_folder (not max_memory["disk"]) spills to /content.
+        return {0: _default_gpu_memory_cap(), "cpu": "2GiB"}
     return None
 
 
