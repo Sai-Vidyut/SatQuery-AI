@@ -479,10 +479,10 @@ export function Workspace() {
   const inspectorOpen = running || result != null || analysisError != null;
 
   return (
-    <main className="relative h-[100dvh] w-full overflow-hidden bg-[var(--sq-void)]">
+    <main className="relative h-[100dvh] w-full overflow-hidden bg-transparent">
       <a
         href="#map"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-sm focus:bg-[var(--sq-panel)] focus:px-2 focus:py-1 focus:[box-shadow:var(--sq-focus)]"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[var(--radius-sm)] focus:bg-[var(--surface-strong)] focus:px-2 focus:py-1 focus:[box-shadow:var(--focus)]"
       >
         Skip to map
       </a>
@@ -507,7 +507,7 @@ export function Workspace() {
 
       {!aoi && inputMode === "catalog" ? (
         <div
-          className="map-hint absolute bottom-[var(--sq-composer-offset)] left-14 z-10"
+          className="map-hint absolute bottom-[var(--composer-offset)] left-14 z-10"
           data-testid="empty-hint"
           role="status"
         >

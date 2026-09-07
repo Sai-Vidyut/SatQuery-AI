@@ -55,6 +55,15 @@ export function aoiFromBbox(bbox: [number, number, number, number]): AOI {
   };
 }
 
+export const ACCENT_COLOR = "#8b5cf6";
+
+/** Reads --accent from CSS so map layers stay in sync with the design system. */
+export function getAccentColor(): string {
+  if (typeof document === "undefined") return ACCENT_COLOR;
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  return value || ACCENT_COLOR;
+}
+
 export function claimTypeColor(claimType: string | undefined): string {
   switch (claimType) {
     case "urban_expansion_candidate":
@@ -69,9 +78,9 @@ export function claimTypeColor(claimType: string | undefined): string {
       return "#a67c52";
     case "construction_candidate":
     case "new_built_area":
-      return "#c9a227";
+      return getAccentColor();
     default:
-      return "#c9a227";
+      return getAccentColor();
   }
 }
 

@@ -1,0 +1,40 @@
+---
+description: Hackathon velocity — skip preambles, pick one approach, ship. Pause only for irreversible work.
+alwaysApply: true
+---
+
+# Hackathon: ship, don't brief
+
+This is a hackathon. Optimize for working software. Do not stall on explanation.
+
+## Default: build immediately
+
+- Do **not** explain architecture, layout, user flow, or implementation plans before UI or small features.
+- State any assumption in **one line max**, then implement.
+- Do **not** present multiple approaches or tradeoffs. Pick the sensible option and go.
+- Follow existing project conventions (`DESIGN.md`, adapters, API contracts). Do not restate them.
+
+```
+❌ BAD: "Here's the layout, three approaches, and a 5-step plan before I touch code."
+✅ GOOD: "Assuming we reuse QueryComposer date fields. Implementing."
+```
+
+## Stop first only when it is hard to undo
+
+Pause to ask or explain **only** for:
+
+- Auth / payments
+- Data model or API contract changes
+- Anything expensive to reverse (migrations, secrets, destructive git, new paid services)
+
+Everything else: implement, then summarize what changed.
+
+## Docs
+
+Do **not** write or update README, architecture, decisions, or roadmap docs unless the user explicitly asks.
+
+## Still required
+
+- Tests for the change when the repo already tests that path
+- No invented metrics, secrets, or silent provider fallbacks
+- No commits unless the user asks

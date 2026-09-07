@@ -24,24 +24,26 @@ export function IconRail({ drawMode, onToggleDraw, onTogglePan }: Props) {
 
       <button
         type="button"
-        className="chrome-btn"
+        className={`chrome-btn${drawMode ? " chrome-btn--active" : ""}`}
         data-testid="rail-draw-aoi"
-        aria-label={drawMode ? "Drawing AOI active" : "Draw AOI"}
+        aria-label={drawMode ? "Drawing AOI — drag on map to draw a rectangle" : "Draw AOI"}
         aria-pressed={drawMode}
-        data-tooltip="Draw AOI (A)"
+        title="Draw AOI"
+        data-tooltip="Draw AOI"
         onClick={onToggleDraw}
       >
-        <BoundingBox size={16} weight="regular" />
+        <BoundingBox size={16} weight={drawMode ? "fill" : "regular"} />
       </button>
       <button
         type="button"
-        className="chrome-btn"
+        className={`chrome-btn${!drawMode ? " chrome-btn--active" : ""}`}
         aria-label="Pan map"
         aria-pressed={!drawMode}
+        title="Pan map"
         data-tooltip="Pan map"
         onClick={onTogglePan}
       >
-        <Hand size={16} weight="regular" />
+        <Hand size={16} weight={!drawMode ? "fill" : "regular"} />
       </button>
     </nav>
   );

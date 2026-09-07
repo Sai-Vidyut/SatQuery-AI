@@ -4,19 +4,29 @@ import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import maplibregl, { type GeoJSONSource, type Map } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import type { AOI, EvidenceRegion } from "@/types/domain";
-import { aoiFromBbox, bboxFromAoi, claimTypeColor, detectionFillOpacity, normalizeBbox } from "@/lib/geo";
+import { aoiFromBbox, bboxFromAoi, claimTypeColor, detectionFillOpacity, getAccentColor, normalizeBbox } from "@/lib/geo";
 
+const ESRI_ATTRIBUTION =
+  "Tiles © Esri — Imagery: Maxar, Earthstar Geographics; Labels: Esri, TomTom, Garmin, FAO, NOAA, USGS, © OpenStreetMap contributors";
+
+const ESRI_IMAGERY_TILES = [
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+];
+
+/** Place-name / boundary overlay (transparent PNG). No API key. Added after imagery loads. */
+const ESRI_LABELS_TILES = [
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+];
+
+/** Esri World Imagery raster only — labels are added in map.on("load") above imagery, below AOI. */
 const SATELLITE_STYLE = {
   version: 8 as const,
   sources: {
     satellite: {
       type: "raster" as const,
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
+      tiles: ESRI_IMAGERY_TILES,
       tileSize: 256,
-      attribution:
-        "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+      attribution: ESRI_ATTRIBUTION,
     },
   },
   layers: [
@@ -27,6 +37,21 @@ const SATELLITE_STYLE = {
     },
   ],
 };
+
+function addLabelsOverlay(map: Map) {
+  if (map.getSource("labels")) return;
+  map.addSource("labels", {
+    type: "raster",
+    tiles: ESRI_LABELS_TILES,
+    tileSize: 256,
+    attribution: ESRI_ATTRIBUTION,
+  });
+  map.addLayer({
+    id: "labels",
+    type: "raster",
+    source: "labels",
+  });
+}
 
 const MIN_AOI_SPAN = 0.0001;
 
@@ -111,14 +136,25 @@ export function MapViewport({
   }, [setDraftBbox]);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    // HMR can leave a stale Map on the shared ref while the container is new.
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
 
     const map = new maplibregl.Map({
-      container: containerRef.current,
+      container,
       style: SATELLITE_STYLE,
       center: [77.6, 12.98],
       zoom: 13,
       attributionControl: false,
+    });
+
+    map.on("error", (event) => {
+      console.error("[map]", event.error?.message ?? event);
     });
 
     map.addControl(
@@ -127,6 +163,13 @@ export function MapViewport({
     );
 
     map.on("load", () => {
+      try {
+        addLabelsOverlay(map);
+      } catch (err) {
+        console.warn("[map] Labels overlay unavailable; satellite imagery only.", err);
+      }
+
+      const accent = getAccentColor();
       map.addSource("aoi", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -136,7 +179,7 @@ export function MapViewport({
         type: "fill",
         source: "aoi",
         paint: {
-          "fill-color": "#c9a227",
+          "fill-color": accent,
           "fill-opacity": 0.14,
         },
       });
@@ -145,7 +188,7 @@ export function MapViewport({
         type: "line",
         source: "aoi",
         paint: {
-          "line-color": "#c9a227",
+          "line-color": accent,
           "line-width": 2,
         },
       });
@@ -159,7 +202,7 @@ export function MapViewport({
         type: "fill",
         source: "aoi-draft",
         paint: {
-          "fill-color": "#c9a227",
+          "fill-color": accent,
           "fill-opacity": 0.08,
         },
       });
@@ -168,7 +211,7 @@ export function MapViewport({
         type: "line",
         source: "aoi-draft",
         paint: {
-          "line-color": "#c9a227",
+          "line-color": accent,
           "line-width": 2,
           "line-dasharray": [2, 1],
         },
@@ -199,9 +242,13 @@ export function MapViewport({
     });
 
     mapRef.current = map;
+    requestAnimationFrame(() => map.resize());
+
     return () => {
       map.remove();
-      mapRef.current = null;
+      if (mapRef.current === map) {
+        mapRef.current = null;
+      }
     };
   }, [mapRef]);
 

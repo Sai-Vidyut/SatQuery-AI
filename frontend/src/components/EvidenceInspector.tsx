@@ -135,7 +135,7 @@ export function EvidenceInspector({
   return (
     <aside
       data-testid="inspector"
-      className="inspector-panel absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-var(--sq-composer-offset))] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
+      className="inspector-panel absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-var(--composer-offset))] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
       style={{ zIndex: 25 }}
     >
       <header className="inspector-header">
@@ -256,10 +256,7 @@ export function EvidenceInspector({
                   <dd>{result.bi_temporal_change.changed_region_count}</dd>
                 </div>
               </dl>
-              <p
-                className="m-0 mt-2 text-[12px]"
-                style={{ fontFamily: "var(--sq-font-mono)", color: "var(--sq-text-muted)" }}
-              >
+              <p className="font-telemetry m-0 mt-2 text-[13px] text-[var(--text-muted)]">
                 {result.bi_temporal_change.provenance}
               </p>
             </div>
@@ -297,10 +294,7 @@ export function EvidenceInspector({
                   </dd>
                 </div>
               </dl>
-              <p
-                className="m-0 mt-2 text-[12px]"
-                style={{ fontFamily: "var(--sq-font-mono)", color: "var(--sq-text-muted)" }}
-              >
+              <p className="font-telemetry m-0 mt-2 text-[13px] text-[var(--text-muted)]">
                 {result.caption.provenance}
               </p>
             </div>
@@ -335,10 +329,7 @@ export function EvidenceInspector({
                   </dd>
                 </div>
               </dl>
-              <p
-                className="m-0 mt-2 text-[12px]"
-                style={{ fontFamily: "var(--sq-font-mono)", color: "var(--sq-text-muted)" }}
-              >
+              <p className="font-telemetry m-0 mt-2 text-[13px] text-[var(--text-muted)]">
                 {result.vqa.provenance}
               </p>
             </div>
@@ -380,8 +371,7 @@ export function EvidenceInspector({
           <div className="inspector-section" style={{ borderBottom: "none", paddingTop: 0 }}>
             <p className="inspector-section__label">Selected region</p>
             <p
-              className="m-0 mb-2 text-[13px] font-medium"
-              style={{ fontFamily: "var(--sq-font-mono)" }}
+              className="font-telemetry m-0 mb-2 text-[15px] font-medium"
             >
               {selectedRegion.id}
             </p>
@@ -426,8 +416,7 @@ export function EvidenceInspector({
               Provenance
             </p>
             <p
-              className="m-0 text-[12px]"
-              style={{ fontFamily: "var(--sq-font-mono)", color: "var(--sq-text-muted)" }}
+              className="font-telemetry m-0 text-[13px] text-[var(--text-muted)]"
             >
               {selectedRegion.source}
             </p>
