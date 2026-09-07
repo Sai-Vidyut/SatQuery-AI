@@ -11,24 +11,24 @@ type Props = {
 function statusColor(status: TraceStep["status"]): string {
   switch (status) {
     case "completed":
-      return "var(--sq-success)";
+      return "var(--success)";
     case "running":
-      return "var(--sq-amber)";
+      return "var(--accent)";
     case "failed":
-      return "var(--sq-danger)";
+      return "var(--danger)";
     default:
-      return "var(--sq-text-faint)";
+      return "var(--text-muted)";
   }
 }
 
 function PlanQueryDetails({ metadata }: { metadata: TraceStep["metadata"] }) {
   if (!metadata || !isPlanQueryMetadata(metadata)) return null;
   return (
-    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--sq-text-faint)]">
+    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--text-muted)]">
       {metadata.planner ? (
         <div className="flex justify-between gap-2">
           <dt>Planner</dt>
-          <dd className="tabular-nums" style={{ fontFamily: "var(--sq-font-mono)" }}>
+          <dd className="tabular-nums" style={{ fontFamily: "var(--font-sans)" }}>
             {metadata.planner}
           </dd>
         </div>
@@ -36,13 +36,13 @@ function PlanQueryDetails({ metadata }: { metadata: TraceStep["metadata"] }) {
       {metadata.intent ? (
         <div className="flex justify-between gap-2">
           <dt>Intent</dt>
-          <dd style={{ fontFamily: "var(--sq-font-mono)" }}>{metadata.intent}</dd>
+          <dd style={{ fontFamily: "var(--font-sans)" }}>{metadata.intent}</dd>
         </div>
       ) : null}
       {metadata.required_tools?.length ? (
         <div>
           <dt>Tools</dt>
-          <dd className="mt-0.5 break-words" style={{ fontFamily: "var(--sq-font-mono)" }}>
+          <dd className="mt-0.5 break-words" style={{ fontFamily: "var(--font-sans)" }}>
             {metadata.required_tools.join(", ")}
           </dd>
         </div>
@@ -50,7 +50,7 @@ function PlanQueryDetails({ metadata }: { metadata: TraceStep["metadata"] }) {
       {metadata.requested_modalities?.length ? (
         <div className="flex justify-between gap-2">
           <dt>Modalities</dt>
-          <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+          <dd style={{ fontFamily: "var(--font-sans)" }}>
             {metadata.requested_modalities.join(", ")}
           </dd>
         </div>
@@ -70,10 +70,10 @@ function FetchImageryDetails({ metadata }: { metadata: FetchImageryMetadata }) {
   const t2 = metadata.t2;
   const strategy = metadata.imagery_strategy ?? "unknown";
   return (
-    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--sq-text-faint)]">
+    <dl className="mt-1 space-y-0.5 text-[10px] text-[var(--text-muted)]">
       <div>
         <dt>Imagery strategy</dt>
-        <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+        <dd style={{ fontFamily: "var(--font-sans)" }}>
           {strategy}
           {metadata.composite_method ? ` (${metadata.composite_method})` : ""}
         </dd>
@@ -81,13 +81,13 @@ function FetchImageryDetails({ metadata }: { metadata: FetchImageryMetadata }) {
       {metadata.demonstration_data ? (
         <div>
           <dt>Data source</dt>
-          <dd className="text-[var(--sq-amber)]">DEMONSTRATION DATA</dd>
+          <dd className="text-[var(--accent)]">DEMONSTRATION DATA</dd>
         </div>
       ) : null}
       {t1 ? (
         <div>
           <dt>T1 requested / window</dt>
-          <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+          <dd style={{ fontFamily: "var(--font-sans)" }}>
             {t1.requested_date ?? "?"} → {t1.window_start}–{t1.window_end} ·{" "}
             {t1.scene_count ?? "?"} scene(s)
           </dd>
@@ -96,7 +96,7 @@ function FetchImageryDetails({ metadata }: { metadata: FetchImageryMetadata }) {
       {t2 ? (
         <div>
           <dt>T2 requested / window</dt>
-          <dd style={{ fontFamily: "var(--sq-font-mono)" }}>
+          <dd style={{ fontFamily: "var(--font-sans)" }}>
             {t2.requested_date ?? "?"} → {t2.window_start}–{t2.window_end} ·{" "}
             {t2.scene_count ?? "?"} scene(s)
           </dd>
@@ -105,7 +105,7 @@ function FetchImageryDetails({ metadata }: { metadata: FetchImageryMetadata }) {
       {metadata.fallback_events?.length ? (
         <div>
           <dt>Imagery fallback</dt>
-          <dd className="mt-0.5 break-words" style={{ fontFamily: "var(--sq-font-mono)" }}>
+          <dd className="mt-0.5 break-words" style={{ fontFamily: "var(--font-sans)" }}>
             {metadata.fallback_events
               .map((e) => `${String(e.epoch)}: ${String(e.policy_decision ?? "fallback")}`)
               .join("; ")}
@@ -128,7 +128,7 @@ function TimingSummary({ steps }: { steps: TraceStep[] }) {
     })
     .filter(Boolean);
   return (
-    <p className="mt-2 text-[10px] text-[var(--sq-text-faint)]" data-testid="trace-timing-summary">
+    <p className="mt-2 text-[10px] text-[var(--text-muted)]" data-testid="trace-timing-summary">
       Timing: {breakdown.join(" · ")} · total {formatDuration(total)}
     </p>
   );
@@ -155,8 +155,8 @@ export function ExecutionTrace({ steps, loading }: Props) {
         <p className="inspector-section__label">Trace</p>
         <ul className="m-0 list-none space-y-1.5 p-0">
           {SKELETON_STEPS.map((name) => (
-            <li key={name} className="trace-row text-[var(--sq-text-faint)]">
-              <span className="trace-mark bg-[var(--sq-text-faint)]" aria-hidden />
+            <li key={name} className="trace-row text-[var(--text-muted)]">
+              <span className="trace-mark bg-[var(--text-muted)]" aria-hidden />
               <span>{traceStepLabel({ id: name, tool_name: name, status: "running" })}</span>
             </li>
           ))}
@@ -197,12 +197,12 @@ export function ExecutionTrace({ steps, loading }: Props) {
                 <FetchImageryDetails metadata={step.metadata as FetchImageryMetadata} />
               ) : null}
               {step.error ? (
-                <p className="mt-0.5 text-[11px] text-[var(--sq-danger)]">{step.error}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--danger)]">{step.error}</p>
               ) : null}
               {step.summary &&
               step.tool_name !== "plan_query" &&
               !step.summary.toLowerCase().includes("running") ? (
-                <p className="mt-0.5 text-[10px] text-[var(--sq-text-faint)]">{step.summary}</p>
+                <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{step.summary}</p>
               ) : null}
             </div>
           </li>

@@ -9,9 +9,11 @@ import { normalizeAnalysisError } from "@/lib/errors";
 import { aoiFromBbox, bboxFromAoi } from "@/lib/geo";
 import { MapViewport } from "@/components/MapViewport";
 import { MapToolCluster } from "@/components/MapToolCluster";
+import { SiteMenu } from "@/components/SiteMenu";
 import { IconRail } from "@/components/IconRail";
 import { QueryComposer, type ComposerInputMode } from "@/components/QueryComposer";
 import { EvidenceInspector } from "@/components/EvidenceInspector";
+import { InspectorTourSlot, WorkstationTour } from "@/components/WorkstationTour";
 
 const DEFAULT_EARLIER_DATE = "2024-12-01";
 const DEFAULT_LATER_DATE = "2025-03-01";
@@ -101,6 +103,7 @@ export function Workspace() {
   const [sarUploadStatus, setSarUploadStatus] = useState<string | null>(null);
   const [pairValidationStatus, setPairValidationStatus] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState({ detections: true, aoi: true });
+  const [tourActive, setTourActive] = useState(false);
   const runStartedAt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -440,6 +443,7 @@ export function Workspace() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (tourActive) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         document.getElementById("composer-query")?.focus();
@@ -457,7 +461,7 @@ export function Workspace() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSelectRegion, selectedRegionId]);
+  }, [handleSelectRegion, selectedRegionId, tourActive]);
 
   useEffect(() => {
     if (running) {
@@ -479,10 +483,10 @@ export function Workspace() {
   const inspectorOpen = running || result != null || analysisError != null;
 
   return (
-    <main className="relative h-[100dvh] w-full overflow-hidden bg-[var(--sq-void)]">
+    <main className="relative h-[100dvh] w-full overflow-hidden bg-transparent">
       <a
         href="#map"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-sm focus:bg-[var(--sq-panel)] focus:px-2 focus:py-1 focus:[box-shadow:var(--sq-focus)]"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[var(--radius-sm)] focus:bg-[var(--surface-strong)] focus:px-2 focus:py-1 focus:[box-shadow:var(--focus)]"
       >
         Skip to map
       </a>
@@ -505,21 +509,13 @@ export function Workspace() {
         />
       </div>
 
-      {!aoi && inputMode === "catalog" ? (
-        <div
-          className="map-hint absolute bottom-[var(--sq-composer-offset)] left-14 z-10"
-          data-testid="empty-hint"
-          role="status"
-        >
-          Draw an area to begin
-        </div>
-      ) : null}
-
       <IconRail
         drawMode={drawMode}
         onToggleDraw={() => setDrawMode(true)}
         onTogglePan={() => setDrawMode(false)}
       />
+
+      {!inspectorOpen ? <SiteMenu variant="standalone" /> : null}
 
       <MapToolCluster
         layers={layerVisibility}
@@ -545,7 +541,11 @@ export function Workspace() {
             syncUrl({ region: null });
           }}
         />
-      ) : null}
+      ) : (
+        <InspectorTourSlot />
+      )}
+
+      <WorkstationTour inputMode={inputMode} onActiveChange={setTourActive} />
 
       <QueryComposer
         inputMode={inputMode}

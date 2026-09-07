@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { UploadCloud } from "lucide-react";
 import type { ImageInput } from "@/types/domain";
 
 export type ComposerInputMode = "catalog" | "upload" | "temporal_pair" | "cross_modal";
@@ -86,12 +87,14 @@ export function QueryComposer({
   const isTemporalPair = inputMode === "temporal_pair";
   const isCrossModal = inputMode === "cross_modal";
 
+  const uploadPlaceholder = "Upload GeoTIFF or TIFF";
+
   return (
     <div className="composer-wrap">
       {statusLine ? <p className="composer-status">{statusLine}</p> : null}
 
-      <div data-testid="composer" className="glass composer-shell">
-        <div className="composer-mode-row">
+      <div data-testid="composer" className="glass-light composer-shell">
+        <div className="composer-mode-row" data-tour="composer-mode-row">
           <button
             type="button"
             className={`btn-secondary ${inputMode === "catalog" ? "btn-secondary--active" : ""}`}
@@ -150,13 +153,17 @@ export function QueryComposer({
                 />
                 <button
                   type="button"
-                  className="composer-aoi-btn"
+                  className="composer-upload-btn"
                   data-testid="composer-upload-optical-trigger"
+                  data-tour="composer-upload-optical"
                   onClick={() => opticalFileRef.current?.click()}
                 >
-                  {uploadedOpticalImage
-                    ? `${uploadedOpticalImage.filename} · ${uploadedOpticalImage.modality}`
-                    : "Optical GeoTIFF/TIFF…"}
+                  <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
+                  <span>
+                    {uploadedOpticalImage
+                      ? `${uploadedOpticalImage.filename} · ${uploadedOpticalImage.modality}`
+                      : uploadPlaceholder}
+                  </span>
                 </button>
                 {opticalUploadStatus ? (
                   <p className="composer-upload-status" data-testid="composer-optical-upload-status">
@@ -179,13 +186,17 @@ export function QueryComposer({
                 />
                 <button
                   type="button"
-                  className="composer-aoi-btn"
+                  className="composer-upload-btn"
                   data-testid="composer-upload-sar-trigger"
+                  data-tour="composer-upload-sar"
                   onClick={() => sarFileRef.current?.click()}
                 >
-                  {uploadedSarImage
-                    ? `${uploadedSarImage.filename} · ${uploadedSarImage.modality}`
-                    : "SAR GeoTIFF/TIFF…"}
+                  <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
+                  <span>
+                    {uploadedSarImage
+                      ? `${uploadedSarImage.filename} · ${uploadedSarImage.modality}`
+                      : uploadPlaceholder}
+                  </span>
                 </button>
                 {sarUploadStatus ? (
                   <p className="composer-upload-status" data-testid="composer-sar-upload-status">
@@ -216,13 +227,17 @@ export function QueryComposer({
                 />
                 <button
                   type="button"
-                  className="composer-aoi-btn"
+                  className="composer-upload-btn"
                   data-testid="composer-upload-earlier-trigger"
+                  data-tour="composer-upload-earlier"
                   onClick={() => earlierFileRef.current?.click()}
                 >
-                  {uploadedEarlierImage
-                    ? `${uploadedEarlierImage.filename} · ${uploadedEarlierImage.acquisition_datetime?.slice(0, 10) ?? "no date"}`
-                    : "Earlier GeoTIFF/TIFF…"}
+                  <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
+                  <span>
+                    {uploadedEarlierImage
+                      ? `${uploadedEarlierImage.filename} · ${uploadedEarlierImage.acquisition_datetime?.slice(0, 10) ?? "no date"}`
+                      : uploadPlaceholder}
+                  </span>
                 </button>
                 {earlierUploadStatus ? (
                   <p className="composer-upload-status" data-testid="composer-earlier-upload-status">
@@ -245,13 +260,17 @@ export function QueryComposer({
                 />
                 <button
                   type="button"
-                  className="composer-aoi-btn"
+                  className="composer-upload-btn"
                   data-testid="composer-upload-later-trigger"
+                  data-tour="composer-upload-later"
                   onClick={() => laterFileRef.current?.click()}
                 >
-                  {uploadedLaterImage
-                    ? `${uploadedLaterImage.filename} · ${uploadedLaterImage.acquisition_datetime?.slice(0, 10) ?? "no date"}`
-                    : "Later GeoTIFF/TIFF…"}
+                  <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
+                  <span>
+                    {uploadedLaterImage
+                      ? `${uploadedLaterImage.filename} · ${uploadedLaterImage.acquisition_datetime?.slice(0, 10) ?? "no date"}`
+                      : uploadPlaceholder}
+                  </span>
                 </button>
                 {laterUploadStatus ? (
                   <p className="composer-upload-status" data-testid="composer-later-upload-status">
@@ -309,11 +328,13 @@ export function QueryComposer({
               />
               <button
                 type="button"
-                className="composer-aoi-btn"
+                className="composer-upload-btn"
                 data-testid="composer-upload-trigger"
+                data-tour="composer-upload-single"
                 onClick={() => fileInputRef.current?.click()}
               >
-                {uploadedImage ? uploadedImage.filename : "Choose GeoTIFF/TIFF…"}
+                <UploadCloud size={16} strokeWidth={1.75} aria-hidden />
+                <span>{uploadedImage ? uploadedImage.filename : uploadPlaceholder}</span>
               </button>
               {uploadStatus ? (
                 <p className="composer-upload-status" data-testid="composer-upload-status">
@@ -392,6 +413,7 @@ export function QueryComposer({
             <input
               id="composer-query"
               data-testid="composer-query"
+              data-tour="composer-query"
               type="text"
               className="input-field input-field--query w-full"
               placeholder={
@@ -416,6 +438,7 @@ export function QueryComposer({
             <button
               type="submit"
               data-testid="composer-run"
+              data-tour="composer-run"
               className="btn-primary"
               disabled={running}
               aria-busy={running}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Minus, Plus, Stack } from "@phosphor-icons/react";
+import { SiteMenu } from "@/components/SiteMenu";
 
 type LayerState = {
   detections: boolean;
@@ -27,10 +28,10 @@ export function MapToolCluster({
 
   return (
     <div
-      className={`map-tools${inspectorOpen ? " map-tools--offset" : ""}`}
+      className={`map-tools${inspectorOpen ? " map-tools--dock-left" : ""}`}
       data-testid="map-tools"
     >
-      <div className="map-tool-cluster">
+      <div className="map-tool-cluster glass-light" data-tour="map-tools">
         <div className="relative">
           <button
             type="button"
@@ -44,7 +45,7 @@ export function MapToolCluster({
           </button>
           {open ? (
             <div
-              className="layer-popover absolute right-0 top-[calc(100%+4px)] w-[200px] p-3"
+              className="layer-popover glass-light absolute right-0 top-[calc(100%+4px)] w-[200px] p-3"
               role="group"
               aria-label="Map layers"
             >
@@ -76,6 +77,7 @@ export function MapToolCluster({
         <button type="button" className="map-tool-btn" aria-label="Zoom out" onClick={onZoomOut}>
           <Minus size={20} weight="regular" />
         </button>
+        {inspectorOpen ? <SiteMenu variant="toolbar" /> : null}
       </div>
     </div>
   );

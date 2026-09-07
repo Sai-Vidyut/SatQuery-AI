@@ -23,7 +23,7 @@ export function ConfidenceMeter({
           <span className="confidence-meter__band"> · {confidenceBand(confidence)}</span>
         </span>
       </div>
-      <p className="m-0 text-[10px] text-[var(--sq-text-faint)]">
+      <p className="m-0 text-[13px] text-[var(--text-muted)]">
         Histogram separability — not event probability.
       </p>
       <div className="confidence-meter__track" aria-hidden>

@@ -1,0 +1,164 @@
+{
+  "design_system": {
+    "name": "Arc Browser Glass / Soft-Futurism",
+    "version": "1.0",
+    "purpose": "Reference design system for frosted translucency, pastel gradients, and soft geometry. Use for SatQuery AI and geospatial workstation UI without reproducing proprietary Arc Browser branding.",
+
+    "design_direction": {
+      "overall_style": "Glass and soft-futurism geospatial workstation",
+      "visual_character": [
+        "premium consumer",
+        "optimistic",
+        "tactile",
+        "map-centric",
+        "evidence-driven",
+        "translucent",
+        "soft geometry"
+      ],
+      "design_goal": "Layer frosted UI over satellite imagery and pastel gradients — technology from 2035, not generic GIS or dark SaaS.",
+      "balance": {
+        "visual_complexity": "medium",
+        "information_density": "medium-high",
+        "map_prominence": "high",
+        "decoration": "low",
+        "glass_depth": "high",
+        "marketing_style": "minimal"
+      },
+      "avoid": [
+        "opaque hard-edged surfaces without translucency",
+        "dark-mode-first layouts",
+        "saturated neon accents",
+        "purple gradient blobs without frosted layering",
+        "excessive shadows and animations",
+        "generic admin-dashboard appearance"
+      ]
+    },
+
+    "color_system": {
+      "mode": "light",
+      "tokens": {
+        "bg": "#fafaff",
+        "bg_gradient": "radial pastel layers (pink, blue, lavender)",
+        "surface": "rgba(255, 255, 255, 0.6)",
+        "surface_strong": "rgba(255, 255, 255, 0.85)",
+        "text": "#0f0f14",
+        "text_muted": "#5a5a68",
+        "border": "rgba(255, 255, 255, 0.5)",
+        "border_alt": "rgba(15, 15, 20, 0.08)",
+        "accent": "#8b5cf6",
+        "accent_soft": "#c4b5fd"
+      },
+      "status": {
+        "success": "#3d9a6a",
+        "warning": "#c47a2c",
+        "danger": "#c44c4c"
+      },
+      "usage_rules": {
+        "background": "Fixed pastel radial gradient on body; content scrolls over it.",
+        "surfaces": "Frosted white with backdrop-filter blur on cards, nav, modals, composer.",
+        "accent_ratio": "Purple accent (#8b5cf6) for primary CTA, focus rings, selected states, AOI/detection vectors.",
+        "text_contrast": "Primary #0f0f14 on frosted surfaces; muted #5a5a68 for labels and secondary copy."
+      }
+    },
+
+    "typography": {
+      "headlines": "PP Neue Montreal (fallback Inter), weight 500",
+      "body": "Inter, weight 400, 16px",
+      "ui": "Inter medium",
+      "scale_px": [13, 15, 17, 20, 26, 36, 52, 72],
+      "rules": [
+        "Max 2–3 font sizes per screen for hierarchy.",
+        "Use tabular-nums for metrics, dates, coordinates.",
+        "Headlines use font-weight 500, not display sizes on workstation chrome."
+      ]
+    },
+
+    "components": {
+      "buttons": {
+        "primary": {
+          "background": "#8b5cf6",
+          "text": "#ffffff",
+          "radius": "12px",
+          "inner_highlight": "inset 0 1px 0 rgba(255,255,255,0.6)"
+        },
+        "secondary": {
+          "background": "rgba(255,255,255,0.6)",
+          "border": "1px rgba(255,255,255,0.5)",
+          "backdrop_filter": "blur(12px)"
+        }
+      },
+      "cards": {
+        "background": "rgba(255,255,255,0.6)",
+        "border": "1px rgba(255,255,255,0.5)",
+        "radius": "16–20px",
+        "backdrop_filter": "blur(20px) saturate(160%)",
+        "shadow": "0 8px 32px rgba(15,15,20,0.08)"
+      },
+      "inputs": {
+        "background": "rgba(255,255,255,0.6)",
+        "border": "rgba(15,15,20,0.08)",
+        "radius": "12px",
+        "focus": "2px #8b5cf6 ring with 2px offset"
+      },
+      "navigation": {
+        "style": "floating pill",
+        "background": "rgba(255,255,255,0.85)",
+        "backdrop_blur": true,
+        "shadow": "0 4px 16px rgba(15,15,20,0.08)"
+      }
+    },
+
+    "layout": {
+      "max_content_width": "1200px",
+      "gutter": "32px",
+      "background_behavior": "fixed gradient on body",
+      "corner_radii": "12–24px generous"
+    },
+
+    "effects": {
+      "depth": "backdrop blur + soft shadows + inner highlights",
+      "shadow_soft": "0 8px 32px rgba(15,15,20,0.08)",
+      "glass_fallback": "opaque surface-strong when prefers-reduced-transparency",
+      "animation": {
+        "duration": "140–250ms",
+        "easing": "ease-out / cubic-bezier(0.2, 0.8, 0.2, 1)"
+      }
+    },
+
+    "responsive_behavior": {
+      "mobile_max_px": 767,
+      "gradient": "Simplify to two radial points below 768px",
+      "blur_mobile": "8px on mobile",
+      "navigation_mobile": "Floating pill collapses to bottom bar"
+    },
+
+    "map_interface": {
+      "priority": "primary",
+      "style": "full-bleed satellite with frosted floating controls",
+      "aoi_detection_color": "var(--accent) / #8b5cf6",
+      "controls": {
+        "background": "rgba(255,255,255,0.85)",
+        "backdrop_filter": "blur(20px)",
+        "border": "1px rgba(255,255,255,0.5)",
+        "shadow": "0 4px 16px rgba(15,15,20,0.08)"
+      }
+    },
+
+    "agent_prompt_guide": {
+      "bias": [
+        "pastel radial gradients on body",
+        "frosted white surfaces with backdrop-blur",
+        "soft purple accent #8b5cf6",
+        "16–20px radii",
+        "inner highlights for glass quality"
+      ],
+      "reject": [
+        "opaque surfaces without translucency",
+        "dark-mode-first designs",
+        "hard geometric elements",
+        "saturated neon",
+        "amber/dark charcoal SatQuery legacy palette"
+      ]
+    }
+  }
+}
