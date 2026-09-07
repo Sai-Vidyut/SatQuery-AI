@@ -2,6 +2,7 @@
 
 import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { DATA_SOURCE_BANNER_TEXT, getDataSourceBanner } from "@/lib/dataSourceLabels";
 import { claimTypeLabel } from "@/lib/geo";
 import { isFetchImageryMetadata } from "@/lib/trace";
 import { ExecutionTrace } from "./ExecutionTrace";
@@ -131,6 +132,7 @@ export function EvidenceInspector({
     result != null &&
     result.answer.toLowerCase().includes("no construction candidates") &&
     evidence.length > 0;
+  const dataSourceBanner = result ? getDataSourceBanner(result) : null;
 
   return (
     <aside
@@ -156,13 +158,17 @@ export function EvidenceInspector({
 
       {result ? (
         <div className="inspector-section">
-          {result.demonstration_data ? (
+          {dataSourceBanner ? (
             <p
               className="inspector-note inspector-note--warning mb-2"
-              data-testid="inspector-demo-banner"
+              data-testid={
+                dataSourceBanner === "demo_mode"
+                  ? "inspector-demo-banner"
+                  : "inspector-mock-providers-banner"
+              }
               role="status"
             >
-              DEMONSTRATION DATA — deterministic fixtures, not real Earth observation.
+              {DATA_SOURCE_BANNER_TEXT[dataSourceBanner]}
             </p>
           ) : null}
           <p className="inspector-section__label">Answer</p>

@@ -21,13 +21,27 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   await page.getByTestId("composer-pair-date-to").fill("2024-01-01");
 
   await page.getByTestId("composer-upload-earlier-trigger").click();
+  const earlierUpload = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/imagery/upload") &&
+      response.request().method() === "POST" &&
+      response.ok(),
+  );
   await page.getByTestId("composer-upload-earlier").setInputFiles(FIXTURE_BEFORE);
+  await earlierUpload;
   await expect(page.getByTestId("composer-earlier-upload-status")).toContainText("Before", {
     timeout: 15_000,
   });
 
   await page.getByTestId("composer-upload-later-trigger").click();
+  const laterUpload = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/imagery/upload") &&
+      response.request().method() === "POST" &&
+      response.ok(),
+  );
   await page.getByTestId("composer-upload-later").setInputFiles(FIXTURE_AFTER);
+  await laterUpload;
   await expect(page.getByTestId("composer-later-upload-status")).toContainText("After", {
     timeout: 15_000,
   });
@@ -37,9 +51,14 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   );
   await page.getByTestId("composer-run").click();
 
-  await expect(page.getByTestId("inspector")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("composer-run")).toHaveText("Run Analysis", {
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId("inspector")).toBeVisible();
   await expect(page.getByTestId("trace")).toBeVisible();
-  await expect(page.getByTestId("inspector-bitemporal-provenance")).toBeVisible();
+  await expect(page.getByTestId("inspector-bitemporal-provenance")).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByTestId("inspector-change-summary")).not.toBeEmpty();
-  await expect(page.getByTestId("region-row").first()).toBeVisible();
+  await expect(page.getByTestId("region-row").first()).toBeVisible({ timeout: 15_000 });
 });

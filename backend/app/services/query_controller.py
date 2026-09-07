@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 from time import perf_counter
 
+from app.core.config import get_settings
 from app.adapters.change.factory import get_upload_change_detector
 from app.adapters.imagery.uploaded.bi_temporal_bridge import build_change_detection_input
 from app.adapters.imagery.uploaded.cross_modal_bridge import (
@@ -436,6 +437,8 @@ class QueryController:
         if plan.user_intent == QueryIntent.BUILDING_TEMPORAL_CHANGE:
             return await self._submit_building_temporal_policy(session_id, trace, request)
 
+        self._reject_unsupported_catalog_sar(request, plan)
+
         try:
             imagery_out = await self._run_step(
                 trace,
@@ -511,7 +514,7 @@ class QueryController:
                 evidence=evidence_out.regions,
                 trace=trace,
                 mode=imagery_out.result.mode,
-                demonstration_data=request.demo_mode or imagery_out.result.mode == DataMode.DEVELOPMENT,
+                demonstration_data=request.demo_mode,
             )
             self._store.complete(session_id, result)
             return result
@@ -558,6 +561,23 @@ class QueryController:
         except Exception as exc:
             self._fail_trace(trace, exc)
             raise SatQueryError("analysis_failed", str(exc), status_code=500) from exc
+
+    def _reject_unsupported_catalog_sar(
+        self,
+        request: QueryRequest,
+        plan: QueryAnalysisPlan,
+    ) -> None:
+        """Catalog multimodal SAR fusion requires EE imagery; reject before pipeline execution."""
+        if not plan.run_sar:
+            return
+        settings = get_settings()
+        if request.demo_mode or settings.imagery_provider == "development":
+            raise SatQueryError(
+                "catalog_sar_unsupported",
+                "Catalog AOI optical+SAR fusion requires Earth Engine imagery. "
+                "In development mode, use the Cross-modal upload workflow with optical and SAR images.",
+                status_code=422,
+            )
 
     async def _run_imagery_policy_step(
         self,

@@ -400,7 +400,7 @@ export function QueryComposer({
                   Demo mode
                 </label>
                 <p className="composer-upload-status m-0">
-                  Uses DEMONSTRATION DATA (no live Earth Engine).
+                  When checked, uses deterministic demonstration fixtures instead of live Earth Engine.
                 </p>
               </div>
             </>

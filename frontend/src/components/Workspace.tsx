@@ -5,6 +5,8 @@ import type { Map } from "maplibre-gl";
 import type { AnalysisResult, AOI, ImageInput } from "@/types/domain";
 import { api } from "@/lib/api";
 import { parseIsoDate, validateDateRange } from "@/lib/dates";
+import { createAnalysisRequestSequence } from "@/lib/analysisRequestSequence";
+import { resetAnalysisDisplayStateForModeChange } from "@/lib/analysisModeState";
 import { normalizeAnalysisError } from "@/lib/errors";
 import { aoiFromBbox, bboxFromAoi } from "@/lib/geo";
 import { MapViewport } from "@/components/MapViewport";
@@ -77,6 +79,8 @@ function applyUrlParams(params: URLSearchParams): {
 export function Workspace() {
   const mapRef = useRef<Map | null>(null);
   const urlHydratedRef = useRef(false);
+  const analysisRequestSequenceRef = useRef(createAnalysisRequestSequence());
+  const runStartedAt = useRef<number | null>(null);
 
   const [aoi, setAoi] = useState<AOI | null>(null);
   const [drawMode, setDrawMode] = useState(false);
@@ -104,7 +108,6 @@ export function Workspace() {
   const [pairValidationStatus, setPairValidationStatus] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState({ detections: true, aoi: true });
   const [tourActive, setTourActive] = useState(false);
-  const runStartedAt = useRef<number | null>(null);
 
   useEffect(() => {
     if (urlHydratedRef.current) return;
@@ -374,6 +377,7 @@ export function Workspace() {
       console.debug("[SatQuery] submitQuery", payload);
     }
 
+    const requestId = analysisRequestSequenceRef.current.begin();
     setRunning(true);
     setAnalysisError(null);
     setResult(null);
@@ -383,6 +387,8 @@ export function Workspace() {
 
     try {
       const data = await api.submitQuery(payload);
+      if (!analysisRequestSequenceRef.current.isLatest(requestId)) return;
+
       const elapsed = runStartedAt.current
         ? ((performance.now() - runStartedAt.current) / 1000).toFixed(1)
         : "?";
@@ -410,10 +416,13 @@ export function Workspace() {
       }
       syncUrl({ region: null });
     } catch (err) {
+      if (!analysisRequestSequenceRef.current.isLatest(requestId)) return;
       setAnalysisError(normalizeAnalysisError(err));
     } finally {
-      setRunning(false);
-      runStartedAt.current = null;
+      if (analysisRequestSequenceRef.current.isLatest(requestId)) {
+        setRunning(false);
+        runStartedAt.current = null;
+      }
     }
   }, [aoi, demoMode, earlierDate, laterDate, inputMode, query, syncUrl, uploadedImage, uploadedEarlierImage, uploadedLaterImage, uploadedOpticalImage, uploadedSarImage]);
 
@@ -559,11 +568,24 @@ export function Workspace() {
         validationError={validationError}
         statusLine={statusLine}
         onInputModeChange={(mode) => {
+          const modeChanged = inputMode !== mode;
+          if (modeChanged) {
+            const cleared = resetAnalysisDisplayStateForModeChange(
+              { result, selectedRegionId, analysisError, statusLine },
+              inputMode,
+              mode,
+            );
+            setResult(cleared.result);
+            setSelectedRegionId(cleared.selectedRegionId);
+            setAnalysisError(cleared.analysisError);
+            setStatusLine(cleared.statusLine);
+          }
           setInputMode(mode);
           setValidationError(null);
+          const regionPatch: { region?: string | null } = modeChanged ? { region: null } : {};
           if (mode === "upload" && query === DEFAULT_QUERY) {
             setQuery(DEFAULT_VQA_QUERY);
-            syncUrl({ inputMode: mode, query: DEFAULT_VQA_QUERY });
+            syncUrl({ inputMode: mode, query: DEFAULT_VQA_QUERY, ...regionPatch });
           } else if (mode === "temporal_pair") {
             setQuery(DEFAULT_TEMPORAL_QUERY);
             setEarlierDate(DEFAULT_PAIR_EARLIER_DATE);
@@ -573,12 +595,13 @@ export function Workspace() {
               query: DEFAULT_TEMPORAL_QUERY,
               earlierDate: DEFAULT_PAIR_EARLIER_DATE,
               laterDate: DEFAULT_PAIR_LATER_DATE,
+              ...regionPatch,
             });
           } else if (mode === "cross_modal") {
             setQuery(DEFAULT_CROSS_MODAL_QUERY);
-            syncUrl({ inputMode: mode, query: DEFAULT_CROSS_MODAL_QUERY });
+            syncUrl({ inputMode: mode, query: DEFAULT_CROSS_MODAL_QUERY, ...regionPatch });
           } else {
-            syncUrl({ inputMode: mode });
+            syncUrl({ inputMode: mode, ...regionPatch });
           }
         }}
         onFileSelect={handleFileSelect}

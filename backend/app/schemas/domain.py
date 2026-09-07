@@ -250,7 +250,7 @@ class AnalysisResult(BaseModel):
     mode: DataMode = DataMode.DEVELOPMENT
     demonstration_data: bool = Field(
         default=False,
-        description="True when results use deterministic demonstration fixtures, not live catalog.",
+        description="True when the user explicitly requested demo_mode on a catalog query.",
     )
     vqa: SingleImageVQAResult | None = None
     caption: SingleImageCaptionResult | None = None

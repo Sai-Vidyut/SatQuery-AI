@@ -9,24 +9,43 @@ import type {
   TraceStep,
   UploadImageResponse,
 } from "@/types/domain";
+import { parseHttpErrorBody, API_ERROR_MESSAGES } from "@/lib/errors";
 import { ApiError } from "@/types/domain";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+async function readJsonBody(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    if (res.ok) {
+      throw new ApiError(
+        "invalid_response",
+        "Invalid JSON",
+        API_ERROR_MESSAGES.invalid_response,
+      );
+    }
+    throw parseHttpErrorBody(res.status, null);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-  const body = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...init?.headers,
+      },
+    });
+  } catch (err) {
+    throw err;
+  }
+
+  const body = await readJsonBody(res);
   if (!res.ok) {
-    const code = body?.error?.code ?? "analysis_failed";
-    const message = body?.error?.message ?? res.statusText;
-    const userMessage = body?.error?.user_message ?? message;
-    throw new ApiError(code, message, userMessage);
+    throw parseHttpErrorBody(res.status, body);
   }
   return (body as ApiResponse<T>).data;
 }
@@ -69,14 +88,20 @@ export const api = {
     if (options?.benchmarkPairId) {
       form.append("benchmark_pair_id", options.benchmarkPairId);
     }
-    const res = await fetch(`${API_BASE}/api/v1/imagery/upload`, {
-      method: "POST",
-      body: form,
-    });
-    const body = await res.json();
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/v1/imagery/upload`, {
+        method: "POST",
+        body: form,
+      });
+    } catch (err) {
+      throw err;
+    }
+
+    const body = await readJsonBody(res);
     if (!res.ok) {
-      const message = body?.error?.message ?? res.statusText;
-      throw new Error(message);
+      throw parseHttpErrorBody(res.status, body);
     }
     return (body as ApiResponse<UploadImageResponse>).data;
   },

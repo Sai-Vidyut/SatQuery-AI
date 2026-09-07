@@ -243,6 +243,27 @@ def test_demo_mode_answer_labels_demonstration_data():
     assert "DEMONSTRATION DATA" in answer
 
 
+def test_development_provider_without_demo_mode_labels_mock_providers():
+    engine = AnswerEngine()
+    request = QueryRequest(
+        query="Show urban expansion.",
+        aoi=_aoi(),
+        earlier_date=date(2018, 6, 1),
+        later_date=date(2024, 6, 1),
+        demo_mode=False,
+    )
+    evidence = GenerateEvidenceOutput(regions=[_region()], confidence=0.6, metrics=[])
+    answer = engine.compose(
+        request,
+        evidence,
+        DataMode.DEVELOPMENT,
+        change_domain=ChangeDomain.URBAN_EXPANSION,
+        fusion_metadata={"detector_metadata": {"primary_index": "ndbi"}},
+    )
+    assert "MOCK PROVIDERS" in answer
+    assert "DEMONSTRATION DATA" not in answer
+
+
 def test_user_facing_error_messages():
     assert "imagery" in user_facing_message("no_imagery_found").lower()
     assert user_facing_message("unknown_code", "fallback") == "fallback"

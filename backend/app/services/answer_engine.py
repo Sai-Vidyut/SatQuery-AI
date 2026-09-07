@@ -19,6 +19,14 @@ from app.services.query_profiles import BUILDING_CONSTRUCTION_PROFILE
 class AnswerEngine:
     """Template-based explanations from validated evidence. No invented numbers."""
 
+    @staticmethod
+    def _catalog_mode_note(request: QueryRequest, mode: DataMode) -> str:
+        if request.demo_mode:
+            return " [DEMONSTRATION DATA — not real Earth observation]"
+        if mode == DataMode.DEVELOPMENT:
+            return " [MOCK PROVIDERS — development environment, not live satellite catalog]"
+        return ""
+
     def compose(
         self,
         request: QueryRequest,
@@ -54,11 +62,7 @@ class AnswerEngine:
             )
 
         pct = round(evidence.confidence * 100)
-        mode_note = (
-            " [DEMONSTRATION DATA — not real Earth observation]"
-            if mode == DataMode.DEVELOPMENT
-            else ""
-        )
+        mode_note = self._catalog_mode_note(request, mode)
 
         if change_domain:
             return self._compose_domain_catalog_answer(
@@ -274,11 +278,7 @@ class AnswerEngine:
             )
 
         pct = round(evidence.confidence * 100)
-        mode_note = (
-            " [DEMONSTRATION DATA — not real Earth observation]"
-            if mode == DataMode.DEVELOPMENT
-            else ""
-        )
+        mode_note = self._catalog_mode_note(request, mode)
         area_ha = detector_meta.get("area_ha")
         changed_pct = detector_meta.get("changed_percentage")
         area_part = ""

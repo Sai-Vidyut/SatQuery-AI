@@ -1,15 +1,29 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const API_URL = process.env.SATQUERY_API_URL ?? "http://127.0.0.1:8001";
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3002";
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3002",
+    baseURL: BASE_URL,
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "setup",
+      testMatch: /global\.setup\.spec\.ts/,
+    },
+    {
+      name: "chromium",
+      testMatch: /.*\.spec\.ts/,
+      testIgnore: /global\.setup\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+  ],
   webServer: [
     {
       command:
@@ -20,8 +34,8 @@ export default defineConfig({
     },
     {
       command: `SATQUERY_BACKEND_URL=${API_URL} npm run dev -- --port 3002`,
-      url: "http://127.0.0.1:3002",
-      reuseExistingServer: false,
+      url: BASE_URL,
+      reuseExistingServer: true,
       timeout: 120_000,
     },
   ],

@@ -45,6 +45,10 @@ USER_FACING_MESSAGES: dict[str, str] = {
     "invalid_request": (
         "The request is missing required fields or uses an unsupported combination of inputs."
     ),
+    "catalog_sar_unsupported": (
+        "Catalog AOI optical+SAR fusion requires Earth Engine imagery. "
+        "In development mode, use the Cross-modal upload workflow with separate optical and SAR images."
+    ),
 }
 
 

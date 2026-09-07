@@ -89,7 +89,12 @@ MULTIMODAL_QUERY = QueryRequest(
 
 
 @pytest.mark.asyncio
-async def test_multimodal_pipeline_trace_ordering():
+async def test_multimodal_pipeline_trace_ordering(monkeypatch):
+    monkeypatch.setenv("IMAGERY_PROVIDER", "earth_engine")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
     controller = QueryController()
     controller._fetch.execute = AsyncMock(return_value=FetchImageryOutput(result=EE_IMAGERY))
     controller._detect.execute = AsyncMock(
