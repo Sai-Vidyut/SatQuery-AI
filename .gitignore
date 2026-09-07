@@ -3,6 +3,9 @@
 .env
 .env.local
 
+# Accidental nested clone (git clone inside project root)
+SatQuery-AI/
+
 # Python (backend)
 backend/.venv/
 backend/.venv311/
