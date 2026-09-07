@@ -18,7 +18,7 @@ export function IconRail({ drawMode, onToggleDraw, onTogglePan }: Props) {
       <div className="chrome-rail__brand">
         <span className="chrome-rail__mark" aria-hidden />
         <span className="chrome-rail__wordmark" translate="no">
-          SATQUERY
+          SatQuery
         </span>
       </div>
 

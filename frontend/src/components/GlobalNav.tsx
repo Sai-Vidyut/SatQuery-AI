@@ -9,14 +9,15 @@ export function GlobalNav() {
   const pathname = usePathname();
   const isWorkstation = pathname === "/";
   const isHome = pathname === "/home";
+  const isMarketing = pathname === "/tutorial" || pathname === "/credits";
 
-  if (isHome || isWorkstation) {
+  if (isHome || isWorkstation || isMarketing) {
     return null;
   }
 
   return (
-    <header className="site-nav-bar">
-      <div className="site-nav-bar__pill glass-light">
+    <header className="site-nav-bar site-nav-bar--inverse">
+      <div className="site-nav-bar__pill glass">
         <Link href="/home" className="site-nav-bar__brand" data-testid="site-nav-brand">
           <Image
             src="/LOGO.png"
@@ -28,7 +29,7 @@ export function GlobalNav() {
           />
         </Link>
 
-        <SiteMenu variant="pill" />
+        <SiteMenu variant="pill" theme="dark" />
       </div>
     </header>
   );

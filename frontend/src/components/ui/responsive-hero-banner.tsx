@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { HomeHeroLogo } from "@/components/home/HomeHeroLogo";
 
 export type ResponsiveHeroBannerProps = {
   backgroundImageUrl?: string;
@@ -19,7 +18,7 @@ const DEFAULTS = {
   backgroundImageUrl: "/hero-earth.jpg",
   badgeLabel: "New",
   badgeText: "Earth Observation Intelligence",
-  title: "SATQUERY",
+  title: "SatQuery",
   titleLine2: "Interactive Vision-Language Intelligence",
   description: "For Earth Observation",
   primaryButtonText: "ENTER WORKSTATION",
@@ -52,8 +51,6 @@ export function ResponsiveHeroBanner({
       />
       <div className="responsive-hero-banner__overlay" aria-hidden="true" />
       <div className="responsive-hero-banner__fade-bottom" aria-hidden="true" />
-
-      <HomeHeroLogo />
 
       <div className="responsive-hero-banner__content">
         {badgeText ? (

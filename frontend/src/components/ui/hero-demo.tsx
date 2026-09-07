@@ -8,7 +8,7 @@ export default function HeroDemo() {
   return (
     <ResponsiveHeroBanner
       badgeText="Earth Observation Intelligence"
-      title="SATQUERY"
+      title="SatQuery"
       titleLine2="Interactive Vision-Language Intelligence"
       description="For Earth Observation"
       primaryButtonText="ENTER WORKSTATION"

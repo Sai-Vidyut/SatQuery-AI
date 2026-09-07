@@ -7,7 +7,6 @@ import {
   BookOpen,
   Heart,
   Home,
-  Info,
   Map as MapIcon,
   Menu,
 } from "lucide-react";
@@ -16,7 +15,6 @@ const NAV_ITEMS = [
   { href: "/home", label: "Home", Icon: Home, testId: "site-nav-link-home" },
   { href: "/", label: "Workstation", Icon: MapIcon, testId: "site-nav-link-workstation" },
   { href: "/tutorial", label: "Tutorial", Icon: BookOpen, testId: "site-nav-link-tutorial" },
-  { href: "/about", label: "About", Icon: Info, testId: "site-nav-link-about" },
   { href: "/credits", label: "Credits", Icon: Heart, testId: "site-nav-link-credits" },
 ] as const;
 
@@ -29,9 +27,10 @@ export type SiteMenuVariant = "standalone" | "toolbar" | "pill";
 
 type SiteMenuProps = {
   variant?: SiteMenuVariant;
+  theme?: "light" | "dark";
 };
 
-export function SiteMenu({ variant = "standalone" }: SiteMenuProps) {
+export function SiteMenu({ variant = "standalone", theme = "light" }: SiteMenuProps) {
   const pathname = usePathname();
   const menuId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -65,10 +64,12 @@ export function SiteMenu({ variant = "standalone" }: SiteMenuProps) {
     };
   }, [open, close]);
 
+  const surfaceClass = theme === "dark" ? "glass" : "glass-light";
+
   const menuPanel = (
     <div
       id={menuId}
-      className={`site-nav__menu glass-light${open ? " site-nav__menu--open" : ""}${
+      className={`site-nav__menu ${surfaceClass}${open ? " site-nav__menu--open" : ""}${
         variant === "toolbar" ? " site-nav__menu--drop-up" : ""
       }`}
       data-testid="site-nav-menu"

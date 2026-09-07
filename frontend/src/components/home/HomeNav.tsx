@@ -7,7 +7,6 @@ import {
   BookOpen,
   Heart,
   Home,
-  Info,
   Map as MapIcon,
   Menu,
 } from "lucide-react";
@@ -16,7 +15,6 @@ const NAV_ITEMS = [
   { href: "/home", label: "Home", Icon: Home, testId: "site-nav-link-home" },
   { href: "/", label: "Workstation", Icon: MapIcon, testId: "site-nav-link-workstation" },
   { href: "/tutorial", label: "Tutorial", Icon: BookOpen, testId: "site-nav-link-tutorial" },
-  { href: "/about", label: "About", Icon: Info, testId: "site-nav-link-about" },
   { href: "/credits", label: "Credits", Icon: Heart, testId: "site-nav-link-credits" },
 ] as const;
 
