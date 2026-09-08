@@ -59,7 +59,7 @@ SatQuery-AI/
 ├── backend/       # FastAPI API, evidence engine, imagery/change adapters, tests
 ├── frontend/      # Next.js map workstation UI
 ├── services/      # Standalone GeoChat GPU inference service
-├── docs/          # Acceptance procedures and phase documentation
+├── docs/          # Technical documentation and validation guides
 └── experiments/   # ML research and smoke tests (not imported by the app)
 ```
 
