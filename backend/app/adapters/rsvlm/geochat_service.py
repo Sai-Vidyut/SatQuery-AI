@@ -114,11 +114,25 @@ class GeoChatServiceVLM(RemoteSensingVLM):
 
     async def _post(self, path: str, payload: dict) -> dict:
         settings = get_settings()
+        headers: dict[str, str] = {}
+        if "ngrok" in self._base_url:
+            headers["ngrok-skip-browser-warning"] = "true"
         try:
             async with httpx.AsyncClient(timeout=settings.geochat_service_timeout_s) as client:
-                response = await client.post(f"{self._base_url}{path}", json=payload)
+                response = await client.post(
+                    f"{self._base_url}{path}",
+                    json=payload,
+                    headers=headers or None,
+                )
                 response.raise_for_status()
-                return response.json()
+                body = response.json()
+                if not isinstance(body, dict):
+                    raise SatQueryError(
+                        "geochat_malformed_response",
+                        "GeoChat inference service returned a malformed JSON object.",
+                        status_code=502,
+                    )
+                return body
         except httpx.TimeoutException as exc:
             raise SatQueryError(
                 "geochat_service_timeout",
@@ -159,8 +173,8 @@ class GeoChatServiceVLM(RemoteSensingVLM):
         answer = str(body.get("answer", "")).strip()
         if not answer:
             raise SatQueryError(
-                "geochat_service_error",
-                "GeoChat inference service returned an empty answer.",
+                "geochat_malformed_response",
+                "GeoChat inference service returned an empty or missing answer.",
                 status_code=502,
             )
         runtime_ms = int((perf_counter() - t0) * 1000) or int(body.get("runtime_ms", 1))
@@ -236,5 +250,68 @@ class GeoChatServiceVLM(RemoteSensingVLM):
             confidence_available=confidence_available,
             input_image_id=image.id,
             requested_modality=image.modality.value,
+            inference_metadata=inference_metadata,
+        )
+
+    async def run_composite_vqa(
+        self,
+        *,
+        composite_png: bytes,
+        question: str,
+        parameters: GeoChatVQAParameters,
+        composite_image_id: str,
+        modality: str = "optical",
+    ) -> SingleImageVQAResult:
+        request = GeoChatVQARequest(
+            model_id=self._model_id,
+            question=question,
+            image=GeoChatImageBytes(
+                content_base64=base64.b64encode(composite_png).decode("ascii"),
+                format="png",
+                filename=f"{composite_image_id}.png",
+            ),
+            image_metadata=GeoChatImageMetadata(
+                image_id=composite_image_id,
+                modality=modality,
+                width=512,
+                height=512,
+                georeferenced=True,
+                benchmark_dataset=False,
+            ),
+            parameters=_parameters_payload(parameters),
+        )
+        t0 = perf_counter()
+        body = await self._post("/v1/vqa", request.model_dump())
+        answer = str(body.get("answer", "")).strip()
+        if not answer:
+            raise SatQueryError(
+                "geochat_malformed_response",
+                "GeoChat inference service returned an empty or missing answer.",
+                status_code=502,
+            )
+        runtime_ms = int((perf_counter() - t0) * 1000) or int(body.get("runtime_ms", 1))
+        confidence = body.get("confidence")
+        confidence_available = bool(body.get("confidence_available", confidence is not None))
+        provenance = _provenance_text(body)
+        inference_metadata = {
+            "service_url": self._base_url,
+            "runtime_ms": runtime_ms,
+            "evidence_inputs": "before_after_composite_crop",
+            "composite_bytes": len(composite_png),
+            **(body.get("inference_metadata") or {}),
+        }
+        if isinstance(body.get("provenance"), dict):
+            inference_metadata["service_provenance"] = body["provenance"]
+        return SingleImageVQAResult(
+            task=VQATask.SINGLE_IMAGE_VQA,
+            answer=answer,
+            model_name=str(body.get("model_name", self._model_id)),
+            model_version=str(body.get("model_version", "unknown")),
+            provider=VQAProviderKind.GEOCHAT_SERVICE,
+            provenance=provenance,
+            confidence=float(confidence) if confidence_available and confidence is not None else None,
+            confidence_available=confidence_available,
+            input_image_id=composite_image_id,
+            requested_modality=modality,
             inference_metadata=inference_metadata,
         )

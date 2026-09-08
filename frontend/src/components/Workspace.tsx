@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map } from "maplibre-gl";
-import type { AnalysisResult, AOI, ImageInput } from "@/types/domain";
+import type { AnalysisResult, AOI, ImageInput, QueryRequest } from "@/types/domain";
 import { api } from "@/lib/api";
 import { parseIsoDate, validateDateRange } from "@/lib/dates";
 import { createAnalysisRequestSequence } from "@/lib/analysisRequestSequence";
@@ -15,7 +15,13 @@ import { SiteMenu } from "@/components/SiteMenu";
 import { IconRail } from "@/components/IconRail";
 import { QueryComposer, type ComposerInputMode } from "@/components/QueryComposer";
 import { EvidenceInspector } from "@/components/EvidenceInspector";
+import { GroundViewOverlay } from "@/components/GroundViewOverlay";
 import { InspectorTourSlot, WorkstationTour } from "@/components/WorkstationTour";
+import {
+  generateAoiGroundViewPoints,
+  type GroundViewPoint,
+} from "@/lib/aoiGroundView";
+import { captureMapViewportState, restoreMapViewportState } from "@/lib/mapViewportState";
 
 const DEFAULT_EARLIER_DATE = "2024-12-01";
 const DEFAULT_LATER_DATE = "2025-03-01";
@@ -91,6 +97,8 @@ export function Workspace() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [lastResult, setLastResult] = useState<AnalysisResult | null>(null);
+  const [inspectorPanelOpen, setInspectorPanelOpen] = useState(false);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [statusLine, setStatusLine] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
@@ -108,6 +116,12 @@ export function Workspace() {
   const [pairValidationStatus, setPairValidationStatus] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState({ detections: true, aoi: true });
   const [tourActive, setTourActive] = useState(false);
+  const [chatResetKey, setChatResetKey] = useState(0);
+  const [groundViewOpen, setGroundViewOpen] = useState(false);
+  const [selectedGroundViewPoint, setSelectedGroundViewPoint] = useState<GroundViewPoint | null>(
+    null,
+  );
+  const mapSnapshotRef = useRef<ReturnType<typeof captureMapViewportState> | null>(null);
 
   useEffect(() => {
     if (urlHydratedRef.current) return;
@@ -383,6 +397,7 @@ export function Workspace() {
     setResult(null);
     setSelectedRegionId(null);
     setStatusLine(null);
+    setInspectorPanelOpen(true);
     runStartedAt.current = performance.now();
 
     try {
@@ -393,6 +408,8 @@ export function Workspace() {
         ? ((performance.now() - runStartedAt.current) / 1000).toFixed(1)
         : "?";
       setResult(data.result);
+      setLastResult(data.result);
+      setChatResetKey((key) => key + 1);
       if (data.result.cross_modal) {
         setStatusLine(
           `Cross-modal · ${data.result.cross_modal.fused_analysis.fused_region_count} fused regions · ${elapsed}s`,
@@ -450,6 +467,36 @@ export function Workspace() {
     [syncUrl],
   );
 
+  const groundViewPoints = useMemo(
+    () => (aoi ? generateAoiGroundViewPoints(aoi) : []),
+    [aoi],
+  );
+
+  const openGroundView = useCallback((point: GroundViewPoint) => {
+    const map = mapRef.current;
+    if (map) {
+      mapSnapshotRef.current = captureMapViewportState(map);
+    }
+    setSelectedGroundViewPoint(point);
+    setGroundViewOpen(true);
+  }, []);
+
+  const closeGroundView = useCallback(() => {
+    setGroundViewOpen(false);
+    setSelectedGroundViewPoint(null);
+    const map = mapRef.current;
+    const snapshot = mapSnapshotRef.current;
+    if (map && snapshot) {
+      requestAnimationFrame(() => {
+        map.resize();
+        requestAnimationFrame(() => {
+          restoreMapViewportState(map, snapshot);
+          mapSnapshotRef.current = null;
+        });
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (tourActive) return;
@@ -485,14 +532,19 @@ export function Workspace() {
   const selectedRegion =
     result?.evidence.find((r) => r.id === selectedRegionId) ?? null;
 
+  const displayResult = result ?? lastResult;
+  const inspectorOpen = inspectorPanelOpen || running || analysisError != null;
+  const showReopenPill = lastResult != null && !inspectorPanelOpen && !running;
+
   const aoiLabel = aoi
     ? `AOI · ${aoi.area_km2?.toFixed(1) ?? "?"} km²`
     : "Draw AOI";
 
-  const inspectorOpen = running || result != null || analysisError != null;
-
   return (
-    <main className="relative h-[100dvh] w-full overflow-hidden bg-transparent">
+    <main
+      className="relative h-[100dvh] w-full overflow-hidden bg-transparent"
+      data-reopen-pill={showReopenPill ? "true" : undefined}
+    >
       <a
         href="#map"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[var(--radius-sm)] focus:bg-[var(--surface-strong)] focus:px-2 focus:py-1 focus:[box-shadow:var(--focus)]"
@@ -503,10 +555,12 @@ export function Workspace() {
       <div id="map" className="absolute inset-0">
         <MapViewport
           aoi={aoi}
-          evidence={result?.evidence ?? []}
+          evidence={displayResult?.evidence ?? []}
           selectedRegionId={selectedRegionId}
           drawMode={drawMode}
           layerVisibility={layerVisibility}
+          groundViewPoints={groundViewPoints}
+          groundViewOpen={groundViewOpen}
           onAoiDrawn={(next) => {
             setAoi(next);
             setDrawMode(false);
@@ -514,6 +568,7 @@ export function Workspace() {
             syncUrl({ aoi: next });
           }}
           onSelectRegion={handleSelectRegion}
+          onGroundViewPointSelect={openGroundView}
           mapRef={mapRef}
         />
       </div>
@@ -525,6 +580,20 @@ export function Workspace() {
       />
 
       {!inspectorOpen ? <SiteMenu variant="standalone" /> : null}
+
+      {showReopenPill ? (
+        <button
+          type="button"
+          className="reopen-result-pill glass"
+          data-testid="reopen-last-result"
+          onClick={() => {
+            setResult(lastResult);
+            setInspectorPanelOpen(true);
+          }}
+        >
+          Reopen last result
+        </button>
+      ) : null}
 
       <MapToolCluster
         layers={layerVisibility}
@@ -538,11 +607,15 @@ export function Workspace() {
         <EvidenceInspector
           result={result}
           selectedRegion={selectedRegion}
+          selectedRegionId={selectedRegionId}
           running={running}
           analysisError={analysisError}
           onSelectRegion={(id) => handleSelectRegion(id)}
+          chatResetKey={chatResetKey}
           onClose={() => {
             if (running) return;
+            if (result) setLastResult(result);
+            setInspectorPanelOpen(false);
             setResult(null);
             setSelectedRegionId(null);
             setStatusLine(null);
@@ -555,6 +628,10 @@ export function Workspace() {
       )}
 
       <WorkstationTour inputMode={inputMode} onActiveChange={setTourActive} />
+
+      {groundViewOpen && selectedGroundViewPoint ? (
+        <GroundViewOverlay point={selectedGroundViewPoint} onClose={closeGroundView} />
+      ) : null}
 
       <QueryComposer
         inputMode={inputMode}
@@ -579,6 +656,7 @@ export function Workspace() {
             setSelectedRegionId(cleared.selectedRegionId);
             setAnalysisError(cleared.analysisError);
             setStatusLine(cleared.statusLine);
+            setInspectorPanelOpen(false);
           }
           setInputMode(mode);
           setValidationError(null);
@@ -636,6 +714,7 @@ export function Workspace() {
         onBboxSubmit={handleBboxSubmit}
         demoMode={demoMode}
         onDemoModeChange={setDemoMode}
+        inspectorOpen={inspectorOpen}
       />
     </main>
   );

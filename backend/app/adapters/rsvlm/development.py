@@ -60,6 +60,46 @@ class DevelopmentGeoChatVLM(RemoteSensingVLM):
             },
         )
 
+    async def run_composite_vqa(
+        self,
+        *,
+        composite_png: bytes,
+        question: str,
+        parameters: GeoChatVQAParameters,
+        composite_image_id: str,
+        modality: str = "optical",
+    ) -> SingleImageVQAResult:
+        t0 = perf_counter()
+        digest = hashlib.sha256(f"{composite_image_id}:{question}".encode()).hexdigest()[:12]
+        answer = (
+            f"[development mock — not MBZUAI/geochat-7B] "
+            f"Mock evidence-grounded interpretation for region composite {composite_image_id}. "
+            f"The BEFORE (left) and AFTER (right) panels show the detected change area. "
+            f"Question noted: {question.strip()[:240]} "
+            f"(ref {digest})."
+        )
+        runtime_ms = int((perf_counter() - t0) * 1000) or 1
+        return SingleImageVQAResult(
+            task=VQATask.SINGLE_IMAGE_VQA,
+            answer=answer,
+            model_name="development-mock-geochat",
+            model_version="0.0.0-dev",
+            provider=VQAProviderKind.DEVELOPMENT,
+            provenance="Development mock RS-VLM region interpretation — not MBZUAI/geochat-7B.",
+            confidence=None,
+            confidence_available=False,
+            input_image_id=composite_image_id,
+            requested_modality=modality,
+            inference_metadata={
+                "mock": True,
+                "evidence_inputs": "before_after_composite_crop",
+                "composite_bytes": len(composite_png),
+                "runtime_ms": runtime_ms,
+                "max_new_tokens": parameters.max_new_tokens,
+                "do_sample": parameters.do_sample,
+            },
+        )
+
     async def run_caption(
         self,
         *,

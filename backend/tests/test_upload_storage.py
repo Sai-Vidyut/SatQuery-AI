@@ -50,6 +50,8 @@ def test_assert_safe_image_id_rejects_bad_ids():
 
 
 def test_probe_geotiff_metadata(upload_root):
+    import rasterio
+
     path = upload_root / "scene.tif"
     write_geotiff(path)
     probe = probe_raster(path, ImageFormat.GEOTIFF)
@@ -57,6 +59,9 @@ def test_probe_geotiff_metadata(upload_root):
     assert probe.height == 64
     assert probe.georeferenced is True
     assert probe.bounds is not None
+    with rasterio.open(path) as src:
+        expected = [src.bounds.left, src.bounds.bottom, src.bounds.right, src.bounds.top]
+    assert probe.bounds == pytest.approx(expected, rel=0, abs=1e-9)
 
 
 def test_build_image_input_from_geotiff(upload_root):

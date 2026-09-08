@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { UploadCloud } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ChevronRight, UploadCloud } from "lucide-react";
 import type { ImageInput } from "@/types/domain";
 
 export type ComposerInputMode = "catalog" | "upload" | "temporal_pair" | "cross_modal";
@@ -39,6 +39,7 @@ type Props = {
   onBboxSubmit: (bbox: string) => void;
   demoMode: boolean;
   onDemoModeChange: (enabled: boolean) => void;
+  inspectorOpen?: boolean;
 };
 
 export function QueryComposer({
@@ -74,14 +75,26 @@ export function QueryComposer({
   onBboxSubmit,
   demoMode,
   onDemoModeChange,
+  inspectorOpen = false,
 }: Props) {
   const [showBbox, setShowBbox] = useState(false);
   const [bboxText, setBboxText] = useState("");
+  const [queryFocused, setQueryFocused] = useState(false);
+  const [dateFocusedId, setDateFocusedId] = useState<string | null>(null);
+  const [composerExpanded, setComposerExpanded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const earlierFileRef = useRef<HTMLInputElement>(null);
   const laterFileRef = useRef<HTMLInputElement>(null);
   const opticalFileRef = useRef<HTMLInputElement>(null);
   const sarFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (inspectorOpen) {
+      setComposerExpanded(false);
+    } else {
+      setComposerExpanded(true);
+    }
+  }, [inspectorOpen]);
 
   const isUpload = inputMode === "upload";
   const isTemporalPair = inputMode === "temporal_pair";
@@ -89,11 +102,85 @@ export function QueryComposer({
 
   const uploadPlaceholder = "Upload GeoTIFF or TIFF";
 
+  const queryPlaceholder = isCrossModal
+    ? "Use the optical and SAR images together to identify built-up and water-covered regions."
+    : isTemporalPair
+      ? "What changed between these two dates, and where did the change occur?"
+      : isUpload
+        ? "Describe the land-cover and major objects visible…"
+        : "Ask a question about this area…";
+
+  const dateInputClass = (id: string) =>
+    `input-field input-field--date${dateFocusedId !== id ? " input-field--settled" : ""}`;
+
+  const composerSlidOff = inspectorOpen && !composerExpanded;
+  const composerConstrained = inspectorOpen && composerExpanded;
+
   return (
-    <div className="composer-wrap">
+    <>
+      {composerSlidOff ? (
+        <button
+          type="button"
+          className="composer-pull-tab"
+          data-testid="composer-pull-tab"
+          aria-label="Show query composer"
+          onClick={() => {
+            setComposerExpanded(true);
+            onQueryChange("");
+          }}
+        >
+          <ChevronRight size={20} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+      ) : null}
+
+      <div
+        className={`composer-wrap${composerSlidOff ? " composer-wrap--slid-off" : ""}${
+          composerConstrained ? " composer-wrap--inspector-open" : ""
+        }`}
+      >
       {statusLine ? <p className="composer-status">{statusLine}</p> : null}
 
       <div data-testid="composer" className="glass-light composer-shell">
+        <div className="composer-stack">
+        <form
+          className="composer-query-bar"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onRun();
+          }}
+        >
+          <input
+            id="composer-query"
+            data-testid="composer-query"
+            data-tour="composer-query"
+            type="text"
+            className={`composer-query-input${!queryFocused ? " composer-query-input--settled" : ""}`}
+            placeholder={queryPlaceholder}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onFocus={() => setQueryFocused(true)}
+            onBlur={() => setQueryFocused(false)}
+            spellCheck={false}
+            autoComplete="off"
+            required
+          />
+          <button
+            type="submit"
+            data-testid="composer-run"
+            data-tour="composer-run"
+            className="composer-query-send"
+            disabled={running}
+            aria-busy={running}
+            aria-label={running ? "Running analysis" : "Run analysis"}
+          >
+            {running ? (
+              <span className="btn-spinner" aria-hidden />
+            ) : (
+              <ArrowRight size={18} strokeWidth={2} aria-hidden />
+            )}
+          </button>
+        </form>
+
         <div className="composer-mode-row" data-tour="composer-mode-row">
           <button
             type="button"
@@ -291,9 +378,11 @@ export function QueryComposer({
                   id="composer-pair-date-from"
                   data-testid="composer-pair-date-from"
                   type="date"
-                  className="input-field input-field--date"
+                  className={dateInputClass("composer-pair-date-from")}
                   value={earlierDate}
                   onChange={(e) => onEarlierChange(e.target.value)}
+                  onFocus={() => setDateFocusedId("composer-pair-date-from")}
+                  onBlur={() => setDateFocusedId(null)}
                   required
                 />
               </div>
@@ -305,9 +394,11 @@ export function QueryComposer({
                   id="composer-pair-date-to"
                   data-testid="composer-pair-date-to"
                   type="date"
-                  className="input-field input-field--date"
+                  className={dateInputClass("composer-pair-date-to")}
                   value={laterDate}
                   onChange={(e) => onLaterChange(e.target.value)}
+                  onFocus={() => setDateFocusedId("composer-pair-date-to")}
+                  onBlur={() => setDateFocusedId(null)}
                   required
                 />
               </div>
@@ -368,9 +459,11 @@ export function QueryComposer({
                   id="composer-date-from"
                   data-testid="composer-date-from"
                   type="date"
-                  className="input-field input-field--date"
+                  className={dateInputClass("composer-date-from")}
                   value={earlierDate}
                   onChange={(e) => onEarlierChange(e.target.value)}
+                  onFocus={() => setDateFocusedId("composer-date-from")}
+                  onBlur={() => setDateFocusedId(null)}
                   required
                 />
               </div>
@@ -383,13 +476,15 @@ export function QueryComposer({
                   id="composer-date-to"
                   data-testid="composer-date-to"
                   type="date"
-                  className="input-field input-field--date"
+                  className={dateInputClass("composer-date-to")}
                   value={laterDate}
                   onChange={(e) => onLaterChange(e.target.value)}
+                  onFocus={() => setDateFocusedId("composer-date-to")}
+                  onBlur={() => setDateFocusedId(null)}
                   required
                 />
               </div>
-              <div className="composer-segment">
+              <div className="composer-segment composer-segment--demo">
                 <label className="composer-label flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -399,60 +494,12 @@ export function QueryComposer({
                   />
                   Demo mode
                 </label>
-                <p className="composer-upload-status m-0">
+                <p className="composer-demo-note">
                   When checked, uses deterministic demonstration fixtures instead of live Earth Engine.
                 </p>
               </div>
             </>
           ) : null}
-
-          <div className="composer-segment composer-segment--grow">
-            <label htmlFor="composer-query" className="composer-label">
-              Query
-            </label>
-            <input
-              id="composer-query"
-              data-testid="composer-query"
-              data-tour="composer-query"
-              type="text"
-              className="input-field input-field--query w-full"
-              placeholder={
-                isCrossModal
-                  ? "Use the optical and SAR images together to identify built-up and water-covered regions."
-                  : isTemporalPair
-                    ? "What changed between these two dates, and where did the change occur?"
-                    : isUpload
-                      ? "Describe the land-cover and major objects visible…"
-                      : "Show significant new construction…"
-              }
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              spellCheck={false}
-              autoComplete="off"
-              required
-            />
-          </div>
-
-          <div className="composer-segment composer-segment--run">
-            <span className="composer-label sr-only">Run</span>
-            <button
-              type="submit"
-              data-testid="composer-run"
-              data-tour="composer-run"
-              className="btn-primary"
-              disabled={running}
-              aria-busy={running}
-            >
-              {running ? (
-                <>
-                  <span className="btn-spinner" aria-hidden />
-                  Running…
-                </>
-              ) : (
-                "Run Analysis"
-              )}
-            </button>
-          </div>
         </form>
 
         {inputMode === "catalog" && showBbox ? (
@@ -484,7 +531,9 @@ export function QueryComposer({
             {validationError}
           </p>
         ) : null}
+        </div>
       </div>
     </div>
+    </>
   );
 }

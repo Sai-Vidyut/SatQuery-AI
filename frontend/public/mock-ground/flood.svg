@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Demonstration flood ground context">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9eb6c9"/>
+      <stop offset="100%" stop-color="#d7e3ec"/>
+    </linearGradient>
+    <linearGradient id="flood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5f8ea8"/>
+      <stop offset="100%" stop-color="#3f677d"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky)"/>
+  <rect y="250" width="640" height="110" fill="#8f9488"/>
+  <path d="M0 280 Q120 250 240 275 T480 260 T640 285 L640 360 L0 360 Z" fill="url(#flood)"/>
+  <rect x="80" y="190" width="90" height="55" fill="#7a8088"/>
+  <rect x="470" y="205" width="110" height="45" fill="#6f757d"/>
+  <text x="24" y="34" fill="#1f3340" font-family="system-ui,sans-serif" font-size="18" font-weight="600">DEMO · Wet-area context</text>
+</svg>

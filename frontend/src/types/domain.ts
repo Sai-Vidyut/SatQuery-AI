@@ -209,6 +209,128 @@ export interface BiTemporalChangeResult {
   inference_metadata?: Record<string, unknown>;
 }
 
+export interface BiTemporalRegionInterpretationResult {
+  task: "bi_temporal_region_interpretation";
+  answer: string;
+  region_id: string;
+  session_id: string;
+  question: string;
+  detector: string;
+  region_confidence: number;
+  confidence_kind?: "histogram_separability" | null;
+  change_direction_hint?: string | null;
+  model_name: string;
+  model_version: string;
+  provider: "development" | "geochat_service";
+  provenance: string;
+  confidence_available: boolean;
+  inference_metadata?: Record<string, unknown>;
+  earlier_image_id: string;
+  later_image_id: string;
+  preview_bbox_wgs84: string;
+  evidence_inputs: "before_after_composite_crop";
+}
+
+export interface InterpretRegionData {
+  interpretation: BiTemporalRegionInterpretationResult;
+  trace_step: TraceStep;
+}
+
+export interface ConversationTurnRecord {
+  turn_id: string;
+  turn_index: number;
+  user_message: string;
+  assistant_answer: string;
+  created_at: string;
+  route?: "geo" | "general" | null;
+  provider?: "development" | "geochat_service" | "groq" | null;
+  scope?: "selected_region" | "general_assistant" | null;
+}
+
+export interface RegionConversationRecord {
+  conversation_id: string;
+  session_id: string;
+  region_id: string;
+  turns: ConversationTurnRecord[];
+}
+
+export interface BiTemporalRegionChatResult {
+  task: "bi_temporal_region_chat";
+  answer: string;
+  session_id: string;
+  region_id: string;
+  conversation_id: string;
+  turn_id: string;
+  turn_index: number;
+  message: string;
+  detector: string;
+  region_confidence: number;
+  confidence_kind?: "histogram_separability" | null;
+  change_direction_hint?: string | null;
+  model_name: string;
+  model_version: string;
+  provider: "development" | "geochat_service" | "groq";
+  provenance: string;
+  confidence_available: boolean;
+  inference_metadata?: Record<string, unknown>;
+  route: "geo" | "general";
+  classification: "geo" | "general" | "ambiguous";
+  scope: "selected_region" | "general_assistant";
+  preview_bbox_wgs84: string;
+  evidence_inputs: "before_after_composite_crop" | "general_assistant_no_imagery";
+  scope_limited: boolean;
+  conversation: RegionConversationRecord;
+}
+
+export interface RegionChatData {
+  chat: BiTemporalRegionChatResult;
+  trace_step: TraceStep;
+}
+
+export type GroundSceneCategory =
+  | "vegetation_loss"
+  | "built_up_increase"
+  | "water_shrinkage"
+  | "flood"
+  | "generic_change";
+
+export interface GroundContextLocation {
+  latitude: number;
+  longitude: number;
+}
+
+export interface GroundContextScene {
+  category: GroundSceneCategory;
+  title: string;
+  description: string;
+  features: string[];
+}
+
+export interface GroundContextImage {
+  asset_id: string;
+  url: string;
+  alt: string;
+}
+
+export interface GroundContextProvenance {
+  provider: "mock_ground_context";
+  source_type: "mock";
+  status: "demonstration_data";
+  real_world_imagery: false;
+  disclosure: string;
+}
+
+export interface GroundContextResult {
+  session_id: string;
+  region_id: string;
+  location: GroundContextLocation;
+  heading: number;
+  capture_date: string;
+  scene: GroundContextScene;
+  image: GroundContextImage;
+  provenance: GroundContextProvenance;
+}
+
 export interface Metric {
   name: string;
   value: number | string;

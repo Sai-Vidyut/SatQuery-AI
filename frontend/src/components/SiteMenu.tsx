@@ -69,9 +69,7 @@ export function SiteMenu({ variant = "standalone", theme = "light" }: SiteMenuPr
   const menuPanel = (
     <div
       id={menuId}
-      className={`site-nav__menu ${surfaceClass}${open ? " site-nav__menu--open" : ""}${
-        variant === "toolbar" ? " site-nav__menu--drop-up" : ""
-      }`}
+      className={`site-nav__menu ${surfaceClass}${open ? " site-nav__menu--open" : ""}`}
       data-testid="site-nav-menu"
       aria-hidden={!open}
       inert={!open}
@@ -105,7 +103,7 @@ export function SiteMenu({ variant = "standalone", theme = "light" }: SiteMenuPr
 
   if (variant === "toolbar") {
     return (
-      <div ref={rootRef} className="site-nav site-nav--toolbar">
+      <div ref={rootRef} className="site-nav site-nav--toolbar site-nav--toolbar-end">
         <button
           type="button"
           className="map-tool-btn site-nav__trigger site-nav__trigger--toolbar"

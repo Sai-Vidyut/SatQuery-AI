@@ -2,6 +2,9 @@
 
 import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { BeforeAfterEvidenceViewer } from "@/components/BeforeAfterEvidenceViewer";
+import { RegionDeterministicSummary } from "@/components/RegionDeterministicSummary";
+import { WorkstationGeoChatDrawer } from "@/components/WorkstationGeoChatDrawer";
 import { DATA_SOURCE_BANNER_TEXT, getDataSourceBanner } from "@/lib/dataSourceLabels";
 import { claimTypeLabel } from "@/lib/geo";
 import { isFetchImageryMetadata } from "@/lib/trace";
@@ -93,10 +96,12 @@ function CatalogProvenance({ result }: { result: AnalysisResult }) {
 type Props = {
   result: AnalysisResult | null;
   selectedRegion: EvidenceRegion | null;
+  selectedRegionId: string | null;
   running: boolean;
   analysisError: string | null;
   onSelectRegion: (id: string) => void;
   onClose: () => void;
+  chatResetKey: number;
 };
 
 function modalityLabel(region: EvidenceRegion): string {
@@ -117,10 +122,12 @@ function claimLabel(region: EvidenceRegion): string {
 export function EvidenceInspector({
   result,
   selectedRegion,
+  selectedRegionId,
   running,
   analysisError,
   onSelectRegion,
   onClose,
+  chatResetKey,
 }: Props) {
   if (!result && !running && !analysisError) return null;
 
@@ -137,17 +144,18 @@ export function EvidenceInspector({
   return (
     <aside
       data-testid="inspector"
-      className="inspector-panel glass-light absolute right-3 top-3 z-25 flex max-h-[calc(100dvh-var(--composer-offset))] w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
+      className="inspector-panel glass-light absolute right-3 z-25 flex w-[min(380px,calc(100%-24px))] flex-col overflow-hidden"
       style={{ zIndex: 25 }}
     >
-      <header className="inspector-header">
+      <header className="inspector-header shrink-0">
         <h2 className="inspector-header__title">Results</h2>
         <button type="button" className="inspector-close" onClick={onClose} aria-label="Close inspector">
           Close
         </button>
       </header>
 
-      <ExecutionTrace steps={result?.trace ?? []} loading={running} />
+      <div className="inspector-body">
+        <ExecutionTrace steps={result?.trace ?? []} loading={running} />
 
       {analysisError && !running ? (
         <div className="inspector-section" role="alert" data-testid="inspector-analysis-error">
@@ -343,7 +351,7 @@ export function EvidenceInspector({
         </div>
       ) : null}
 
-      <div className="inspector-section inspector-section--scroll">
+      <div className="inspector-section">
         {result && evidence.length > 0 ? (
           <>
             <p className="inspector-section__label">Regions ({evidence.length})</p>
@@ -432,11 +440,24 @@ export function EvidenceInspector({
                 Semantic built-area evidence available for this region.
               </p>
             ) : null}
+
+            <BeforeAfterEvidenceViewer result={result!} selectedRegion={selectedRegion} />
+            <RegionDeterministicSummary result={result!} selectedRegion={selectedRegion} />
           </div>
         ) : result && evidence.length > 0 ? (
           <p className="inspector-empty">Select a region on the map.</p>
         ) : null}
       </div>
+      </div>
+
+      {result ? (
+        <WorkstationGeoChatDrawer
+          result={result}
+          selectedRegion={selectedRegion}
+          selectedRegionId={selectedRegionId}
+          chatResetKey={chatResetKey}
+        />
+      ) : null}
     </aside>
   );
 }

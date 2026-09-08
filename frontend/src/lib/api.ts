@@ -1,10 +1,13 @@
 import type {
   AnalysisResult,
   ApiResponse,
+  GroundContextResult,
   ImageryRequest,
   ImageryResult,
   ImageModality,
+  InterpretRegionData,
   QueryRequest,
+  RegionChatData,
   SubmitQueryData,
   TraceStep,
   UploadImageResponse,
@@ -111,4 +114,64 @@ export const api = {
 
   getResult: (sessionId: string) =>
     request<AnalysisResult>(`/api/v1/query/${sessionId}/result`),
+
+  fetchGroundContext: (sessionId: string, regionId: string) =>
+    request<GroundContextResult>(
+      `/api/v1/query/${sessionId}/regions/${encodeURIComponent(regionId)}/ground-context`,
+    ),
+
+  interpretChangeRegion: (sessionId: string, regionId: string, question: string) =>
+    request<InterpretRegionData>(
+      `/api/v1/query/${sessionId}/regions/${encodeURIComponent(regionId)}/interpret`,
+      {
+        method: "POST",
+        body: JSON.stringify({ question }),
+      },
+    ),
+
+  chatChangeRegion: (sessionId: string, regionId: string, message: string) =>
+    request<RegionChatData>(
+      `/api/v1/query/${sessionId}/regions/${encodeURIComponent(regionId)}/chat`,
+      {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      },
+    ),
+
+  chatSession: (sessionId: string, message: string, regionId?: string | null) =>
+    request<RegionChatData>(`/api/v1/query/${sessionId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        ...(regionId ? { region_id: regionId } : {}),
+      }),
+    }),
+
+  exportRegionEvidenceUrl: (sessionId: string, regionId: string) =>
+    `${API_BASE}/api/v1/query/${sessionId}/regions/${encodeURIComponent(regionId)}/evidence`,
+
+  fetchImageryPreview: async (imageId: string, bbox: string, maxSize = 512): Promise<string> => {
+    const params = new URLSearchParams({ bbox, max_size: String(maxSize) });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/v1/imagery/${imageId}/preview?${params.toString()}`);
+    } catch (err) {
+      throw err;
+    }
+
+    if (!res.ok) {
+      const body = await readJsonBody(res);
+      throw parseHttpErrorBody(res.status, body);
+    }
+
+    const blob = await res.blob();
+    if (!blob.type.startsWith("image/")) {
+      throw new ApiError(
+        "invalid_response",
+        "Preview response was not an image.",
+        API_ERROR_MESSAGES.invalid_response,
+      );
+    }
+    return URL.createObjectURL(blob);
+  },
 };

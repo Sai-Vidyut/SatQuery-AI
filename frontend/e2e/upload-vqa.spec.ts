@@ -33,4 +33,7 @@ test("upload image VQA flow shows trace and answer", async ({ page }) => {
   await expect(page.getByTestId("trace")).toBeVisible();
   await expect(page.getByTestId("inspector-vqa-provenance")).toBeVisible();
   await expect(page.locator(".inspector-answer")).not.toBeEmpty();
+  await expect(page.getByTestId("inspector-chat-drawer")).toHaveClass(/inspector-chat-drawer--collapsed/);
+  await expect(page.getByTestId("region-chat-open")).toBeVisible();
+  await expect(page.getByTestId("region-chat-message")).toHaveCount(0);
 });

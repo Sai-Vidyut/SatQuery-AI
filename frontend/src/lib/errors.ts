@@ -39,13 +39,31 @@ export const API_ERROR_MESSAGES: Record<string, string> = {
   upload_failed: "Image upload failed. Try again with a valid GeoTIFF/TIFF.",
   missing_filename: "Upload filename is required.",
   invalid_acquisition_datetime: "Acquisition date must be in ISO-8601 format.",
-  invalid_image_id: "Invalid image identifier.",
+  preview_bbox_no_intersection: "The preview area does not overlap this image.",
+  invalid_preview_bbox: "Preview bbox must be minx,miny,maxx,maxy in WGS84 degrees.",
+  preview_render_failed: "Could not render an image preview for this crop.",
+  region_not_found: "The selected change region was not found in this analysis session.",
+  not_bi_temporal_session: "Region interpretation is only available for bi-temporal upload analyses.",
   path_traversal: "Invalid upload path.",
   planner_routing_error:
     "Analysis routing failed. Try a simpler query or check your inputs.",
-  geochat_service_error: "GeoChat VQA service returned an error. Check service configuration.",
-  geochat_service_misconfigured: "GeoChat VQA service is not configured for this environment.",
-  geochat_service_timeout: "GeoChat VQA service timed out. Try again later.",
+  geochat_service_error:
+    "GeoChat is unavailable right now. The selected satellite evidence is still available.",
+  geochat_service_misconfigured:
+    "GeoChat is unavailable right now. The selected satellite evidence is still available.",
+  geochat_service_timeout:
+    "GeoChat timed out. The selected satellite evidence is still available.",
+  groq_not_configured:
+    "General AI demo is unavailable. Try a satellite-region question with GeoChat.",
+  groq_service_error:
+    "General AI demo is unavailable. Try a satellite-region question with GeoChat.",
+  groq_service_timeout:
+    "General AI demo is unavailable. Try a satellite-region question with GeoChat.",
+  groq_misconfigured:
+    "General AI demo is unavailable. Try a satellite-region question with GeoChat.",
+  use_region_chat: "Select a detected region before asking GeoChat about bi-temporal evidence.",
+  invalid_chat_message: "Enter a message before sending.",
+  conversation_history_too_large: "This conversation reached its demo turn limit.",
   geochat_vqa_misconfigured: "GeoChat VQA is not configured for this environment.",
   earth_engine_auth_failed: "Earth Engine authentication failed.",
   earth_engine_unavailable: "Earth Engine is unavailable.",

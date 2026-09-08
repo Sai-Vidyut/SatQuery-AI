@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Demonstration water-edge ground context">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8eb8d8"/>
+      <stop offset="100%" stop-color="#d8e8f2"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4f8ea8"/>
+      <stop offset="100%" stop-color="#7eb6c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky)"/>
+  <rect y="210" width="640" height="150" fill="#b8a484"/>
+  <path d="M0 250 Q160 220 320 245 T640 235 L640 360 L0 360 Z" fill="url(#water)"/>
+  <rect x="420" y="170" width="140" height="70" fill="#8a8f96" opacity="0.85"/>
+  <text x="24" y="34" fill="#1f3340" font-family="system-ui,sans-serif" font-size="18" font-weight="600">DEMO · Water-edge context</text>
+</svg>
