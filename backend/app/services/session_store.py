@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from app.schemas.domain import AnalysisResult, AnalysisStatus, TraceStep, TraceStatus
+from app.schemas.region_interpretation import BiTemporalRegionInterpretationResult
 
 
 @dataclass
@@ -39,6 +40,7 @@ class SessionStore:
     def __init__(self) -> None:
         self._sessions: dict[str, QuerySession] = {}
         self._conversations: dict[str, RegionConversation] = {}
+        self._interpretations: dict[str, BiTemporalRegionInterpretationResult] = {}
 
     @staticmethod
     def _conversation_key(session_id: str, region_id: str) -> str:
@@ -64,6 +66,21 @@ class SessionStore:
         conversation = self.get_or_create_conversation(session_id, region_id)
         conversation.turns.append(turn)
         return conversation
+
+    def store_interpretation(
+        self,
+        session_id: str,
+        region_id: str,
+        interpretation: BiTemporalRegionInterpretationResult,
+    ) -> None:
+        self._interpretations[self._conversation_key(session_id, region_id)] = interpretation
+
+    def get_latest_interpretation(
+        self,
+        session_id: str,
+        region_id: str,
+    ) -> BiTemporalRegionInterpretationResult | None:
+        return self._interpretations.get(self._conversation_key(session_id, region_id))
 
     def create(self) -> str:
         session_id = str(uuid.uuid4())

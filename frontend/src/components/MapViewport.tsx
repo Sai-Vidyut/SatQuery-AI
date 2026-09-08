@@ -3,8 +3,9 @@
 import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
 import maplibregl, { type GeoJSONSource, type Map } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
-import type { AOI, EvidenceRegion } from "@/types/domain";
+import type { AOI, EvidenceRegion, GeoJSONGeometry } from "@/types/domain";
 import { aoiFromBbox, bboxFromAoi, claimTypeColor, detectionFillOpacity, getAccentColor, normalizeBbox } from "@/lib/geo";
+import { bboxFromGeometry } from "@/lib/regionPreview";
 
 const ESRI_ATTRIBUTION =
   "Tiles © Esri — Imagery: Maxar, Earthstar Geographics; Labels: Esri, TomTom, Garmin, FAO, NOAA, USGS, © OpenStreetMap contributors";
@@ -466,6 +467,22 @@ export function MapViewport({
   useEffect(() => {
     if (aoi) fitAoi();
   }, [aoi, fitAoi]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedRegionId) return;
+    const region = evidence.find((item) => item.id === selectedRegionId);
+    if (!region) return;
+    const bbox = bboxFromGeometry(region.geometry as GeoJSONGeometry);
+    if (!bbox) return;
+    map.fitBounds(
+      [
+        [bbox[0], bbox[1]],
+        [bbox[2], bbox[3]],
+      ],
+      { padding: { top: 48, bottom: 96, left: 56, right: 400 }, duration: 500 },
+    );
+  }, [selectedRegionId, evidence, mapRef]);
 
   return (
     <div

@@ -277,6 +277,7 @@ class RegionInterpretationService:
             "status": TraceStatus.COMPLETED.value,
             "duration_ms": elapsed,
         }
+        self._store.store_interpretation(session_id, region_id, interpretation)
         return interpretation, step
 
 

@@ -41,7 +41,7 @@ test.describe("SatQuery flagship flow", () => {
     await page.getByTestId("composer-query").fill("Show me significant new construction.");
     await page.getByTestId("composer-run").click();
 
-    await expect(page.getByTestId("composer-run")).toHaveText("Run Analysis", {
+    await expect(page.getByTestId("composer-run")).toBeEnabled({
       timeout: 60_000,
     });
     await expect(page.getByTestId("inspector")).toBeVisible();

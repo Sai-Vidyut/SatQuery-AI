@@ -2,6 +2,9 @@
 
 import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { BeforeAfterEvidenceViewer } from "@/components/BeforeAfterEvidenceViewer";
+import { RegionGeoChatInterpretation } from "@/components/RegionGeoChatInterpretation";
+import { RegionGeoChatConversation } from "@/components/RegionGeoChatConversation";
 import { DATA_SOURCE_BANNER_TEXT, getDataSourceBanner } from "@/lib/dataSourceLabels";
 import { claimTypeLabel } from "@/lib/geo";
 import { isFetchImageryMetadata } from "@/lib/trace";
@@ -433,6 +436,18 @@ export function EvidenceInspector({
                 Semantic built-area evidence available for this region.
               </p>
             ) : null}
+
+            <BeforeAfterEvidenceViewer result={result!} selectedRegion={selectedRegion} />
+            <RegionGeoChatInterpretation
+              sessionId={result!.session_id}
+              result={result!}
+              selectedRegion={selectedRegion}
+            />
+            <RegionGeoChatConversation
+              sessionId={result!.session_id}
+              result={result!}
+              selectedRegion={selectedRegion}
+            />
           </div>
         ) : result && evidence.length > 0 ? (
           <p className="inspector-empty">Select a region on the map.</p>

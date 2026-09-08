@@ -54,7 +54,9 @@ USER_FACING_MESSAGES: dict[str, str] = {
     "invalid_preview_size": "Preview max_size must be between 64 and 2048.",
     "preview_render_failed": "Could not render an image preview for this crop.",
     "region_not_found": "The selected change region was not found in this analysis session.",
-    "not_bi_temporal_session": "Region interpretation is only available for bi-temporal upload analyses.",
+    "not_bi_temporal_session": (
+        "This action is only available for bi-temporal upload analyses."
+    ),
     "geochat_service_error": "GeoChat interpretation service returned an error.",
     "geochat_service_timeout": "GeoChat interpretation service timed out.",
     "geochat_vqa_misconfigured": "GeoChat interpretation is not configured for this environment.",
@@ -62,6 +64,7 @@ USER_FACING_MESSAGES: dict[str, str] = {
     "conversation_history_too_large": "This region conversation has reached its history limit.",
     "conversation_not_found": "Conversation state for this region was not found.",
     "geochat_malformed_response": "GeoChat returned a malformed response.",
+    "evidence_export_failed": "Could not build the region evidence export package.",
 }
 
 

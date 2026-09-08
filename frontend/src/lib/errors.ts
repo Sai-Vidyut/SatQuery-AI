@@ -39,7 +39,11 @@ export const API_ERROR_MESSAGES: Record<string, string> = {
   upload_failed: "Image upload failed. Try again with a valid GeoTIFF/TIFF.",
   missing_filename: "Upload filename is required.",
   invalid_acquisition_datetime: "Acquisition date must be in ISO-8601 format.",
-  invalid_image_id: "Invalid image identifier.",
+  preview_bbox_no_intersection: "The preview area does not overlap this image.",
+  invalid_preview_bbox: "Preview bbox must be minx,miny,maxx,maxy in WGS84 degrees.",
+  preview_render_failed: "Could not render an image preview for this crop.",
+  region_not_found: "The selected change region was not found in this analysis session.",
+  not_bi_temporal_session: "Region interpretation is only available for bi-temporal upload analyses.",
   path_traversal: "Invalid upload path.",
   planner_routing_error:
     "Analysis routing failed. Try a simpler query or check your inputs.",

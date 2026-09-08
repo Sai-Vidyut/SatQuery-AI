@@ -1,12 +1,16 @@
 from fastapi import APIRouter
+from fastapi.responses import Response
 
 from app.core.responses import ApiResponse, SubmitQueryData, success
 from app.schemas.domain import AnalysisResult, QueryRequest, TraceStep
 from app.schemas.region_chat import RegionChatData, RegionChatRequest
 from app.schemas.region_interpretation import InterpretRegionData, RegionInterpretationRequest
+from app.schemas.region_ranking import BiTemporalRegionRankingResult
 from app.services.query_controller import query_controller
 from app.services.region_chat import region_chat_service
+from app.services.region_evidence_export import region_evidence_export_service
 from app.services.region_interpretation import region_interpretation_service
+from app.services.region_ranking import region_ranking_service
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -29,6 +33,15 @@ async def get_result(session_id: str) -> ApiResponse[AnalysisResult]:
     return success(result)
 
 
+@router.get(
+    "/{session_id}/regions/ranked",
+    response_model=ApiResponse[BiTemporalRegionRankingResult],
+)
+async def get_ranked_regions(session_id: str) -> ApiResponse[BiTemporalRegionRankingResult]:
+    ranking = region_ranking_service.rank_session_regions(session_id)
+    return success(ranking)
+
+
 @router.post(
     "/{session_id}/regions/{region_id}/interpret",
     response_model=ApiResponse[InterpretRegionData],
@@ -48,6 +61,19 @@ async def interpret_region(
             interpretation=interpretation,
             trace_step=trace_step.model_dump(mode="json"),
         )
+    )
+
+
+@router.get("/{session_id}/regions/{region_id}/evidence")
+async def export_region_evidence(session_id: str, region_id: str) -> Response:
+    zip_bytes, filename = region_evidence_export_service.export_region_evidence(
+        session_id,
+        region_id,
+    )
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

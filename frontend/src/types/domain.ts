@@ -209,6 +209,78 @@ export interface BiTemporalChangeResult {
   inference_metadata?: Record<string, unknown>;
 }
 
+export interface BiTemporalRegionInterpretationResult {
+  task: "bi_temporal_region_interpretation";
+  answer: string;
+  region_id: string;
+  session_id: string;
+  question: string;
+  detector: string;
+  region_confidence: number;
+  confidence_kind?: "histogram_separability" | null;
+  change_direction_hint?: string | null;
+  model_name: string;
+  model_version: string;
+  provider: "development" | "geochat_service";
+  provenance: string;
+  confidence_available: boolean;
+  inference_metadata?: Record<string, unknown>;
+  earlier_image_id: string;
+  later_image_id: string;
+  preview_bbox_wgs84: string;
+  evidence_inputs: "before_after_composite_crop";
+}
+
+export interface InterpretRegionData {
+  interpretation: BiTemporalRegionInterpretationResult;
+  trace_step: TraceStep;
+}
+
+export interface ConversationTurnRecord {
+  turn_id: string;
+  turn_index: number;
+  user_message: string;
+  assistant_answer: string;
+  created_at: string;
+}
+
+export interface RegionConversationRecord {
+  conversation_id: string;
+  session_id: string;
+  region_id: string;
+  turns: ConversationTurnRecord[];
+}
+
+export interface BiTemporalRegionChatResult {
+  task: "bi_temporal_region_chat";
+  answer: string;
+  session_id: string;
+  region_id: string;
+  conversation_id: string;
+  turn_id: string;
+  turn_index: number;
+  message: string;
+  detector: string;
+  region_confidence: number;
+  confidence_kind?: "histogram_separability" | null;
+  change_direction_hint?: string | null;
+  model_name: string;
+  model_version: string;
+  provider: "development" | "geochat_service";
+  provenance: string;
+  confidence_available: boolean;
+  inference_metadata?: Record<string, unknown>;
+  preview_bbox_wgs84: string;
+  evidence_inputs: "before_after_composite_crop";
+  scope_limited: boolean;
+  conversation: RegionConversationRecord;
+}
+
+export interface RegionChatData {
+  chat: BiTemporalRegionChatResult;
+  trace_step: TraceStep;
+}
+
 export interface Metric {
   name: string;
   value: number | string;
