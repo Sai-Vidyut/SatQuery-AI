@@ -105,7 +105,7 @@ export function SiteMenu({ variant = "standalone", theme = "light" }: SiteMenuPr
 
   if (variant === "toolbar") {
     return (
-      <div ref={rootRef} className="site-nav site-nav--toolbar">
+      <div ref={rootRef} className="site-nav site-nav--toolbar site-nav--toolbar-end">
         <button
           type="button"
           className="map-tool-btn site-nav__trigger site-nav__trigger--toolbar"

@@ -91,6 +91,8 @@ export function Workspace() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [lastResult, setLastResult] = useState<AnalysisResult | null>(null);
+  const [inspectorPanelOpen, setInspectorPanelOpen] = useState(false);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [statusLine, setStatusLine] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
@@ -383,6 +385,7 @@ export function Workspace() {
     setResult(null);
     setSelectedRegionId(null);
     setStatusLine(null);
+    setInspectorPanelOpen(true);
     runStartedAt.current = performance.now();
 
     try {
@@ -393,6 +396,7 @@ export function Workspace() {
         ? ((performance.now() - runStartedAt.current) / 1000).toFixed(1)
         : "?";
       setResult(data.result);
+      setLastResult(data.result);
       if (data.result.cross_modal) {
         setStatusLine(
           `Cross-modal · ${data.result.cross_modal.fused_analysis.fused_region_count} fused regions · ${elapsed}s`,
@@ -485,14 +489,19 @@ export function Workspace() {
   const selectedRegion =
     result?.evidence.find((r) => r.id === selectedRegionId) ?? null;
 
+  const displayResult = result ?? lastResult;
+  const inspectorOpen = inspectorPanelOpen || running || analysisError != null;
+  const showReopenPill = lastResult != null && !inspectorPanelOpen && !running;
+
   const aoiLabel = aoi
     ? `AOI · ${aoi.area_km2?.toFixed(1) ?? "?"} km²`
     : "Draw AOI";
 
-  const inspectorOpen = running || result != null || analysisError != null;
-
   return (
-    <main className="relative h-[100dvh] w-full overflow-hidden bg-transparent">
+    <main
+      className="relative h-[100dvh] w-full overflow-hidden bg-transparent"
+      data-reopen-pill={showReopenPill ? "true" : undefined}
+    >
       <a
         href="#map"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[var(--radius-sm)] focus:bg-[var(--surface-strong)] focus:px-2 focus:py-1 focus:[box-shadow:var(--focus)]"
@@ -503,7 +512,7 @@ export function Workspace() {
       <div id="map" className="absolute inset-0">
         <MapViewport
           aoi={aoi}
-          evidence={result?.evidence ?? []}
+          evidence={displayResult?.evidence ?? []}
           selectedRegionId={selectedRegionId}
           drawMode={drawMode}
           layerVisibility={layerVisibility}
@@ -526,6 +535,20 @@ export function Workspace() {
 
       {!inspectorOpen ? <SiteMenu variant="standalone" /> : null}
 
+      {showReopenPill ? (
+        <button
+          type="button"
+          className="reopen-result-pill glass"
+          data-testid="reopen-last-result"
+          onClick={() => {
+            setResult(lastResult);
+            setInspectorPanelOpen(true);
+          }}
+        >
+          Reopen last result
+        </button>
+      ) : null}
+
       <MapToolCluster
         layers={layerVisibility}
         onLayersChange={setLayerVisibility}
@@ -543,6 +566,8 @@ export function Workspace() {
           onSelectRegion={(id) => handleSelectRegion(id)}
           onClose={() => {
             if (running) return;
+            if (result) setLastResult(result);
+            setInspectorPanelOpen(false);
             setResult(null);
             setSelectedRegionId(null);
             setStatusLine(null);
@@ -579,6 +604,7 @@ export function Workspace() {
             setSelectedRegionId(cleared.selectedRegionId);
             setAnalysisError(cleared.analysisError);
             setStatusLine(cleared.statusLine);
+            setInspectorPanelOpen(false);
           }
           setInputMode(mode);
           setValidationError(null);
@@ -636,6 +662,7 @@ export function Workspace() {
         onBboxSubmit={handleBboxSubmit}
         demoMode={demoMode}
         onDemoModeChange={setDemoMode}
+        inspectorOpen={inspectorOpen}
       />
     </main>
   );
