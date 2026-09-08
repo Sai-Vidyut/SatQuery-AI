@@ -242,6 +242,9 @@ export interface ConversationTurnRecord {
   user_message: string;
   assistant_answer: string;
   created_at: string;
+  route?: "geo" | "general" | null;
+  provider?: "development" | "geochat_service" | "groq" | null;
+  scope?: "selected_region" | "general_assistant" | null;
 }
 
 export interface RegionConversationRecord {
@@ -266,12 +269,15 @@ export interface BiTemporalRegionChatResult {
   change_direction_hint?: string | null;
   model_name: string;
   model_version: string;
-  provider: "development" | "geochat_service";
+  provider: "development" | "geochat_service" | "groq";
   provenance: string;
   confidence_available: boolean;
   inference_metadata?: Record<string, unknown>;
+  route: "geo" | "general";
+  classification: "geo" | "general" | "ambiguous";
+  scope: "selected_region" | "general_assistant";
   preview_bbox_wgs84: string;
-  evidence_inputs: "before_after_composite_crop";
+  evidence_inputs: "before_after_composite_crop" | "general_assistant_no_imagery";
   scope_limited: boolean;
   conversation: RegionConversationRecord;
 }

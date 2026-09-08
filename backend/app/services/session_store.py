@@ -15,6 +15,9 @@ class ConversationTurn:
     user_message: str
     assistant_answer: str
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    route: str | None = None
+    provider: str | None = None
+    scope: str | None = None
 
 
 @dataclass

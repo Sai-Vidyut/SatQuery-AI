@@ -4,7 +4,7 @@ import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } 
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { BeforeAfterEvidenceViewer } from "@/components/BeforeAfterEvidenceViewer";
 import { RegionGeoChatInterpretation } from "@/components/RegionGeoChatInterpretation";
-import { RegionGeoChatConversation } from "@/components/RegionGeoChatConversation";
+import { WorkstationGeoChatDrawer } from "@/components/WorkstationGeoChatDrawer";
 import { DATA_SOURCE_BANNER_TEXT, getDataSourceBanner } from "@/lib/dataSourceLabels";
 import { claimTypeLabel } from "@/lib/geo";
 import { isFetchImageryMetadata } from "@/lib/trace";
@@ -96,10 +96,12 @@ function CatalogProvenance({ result }: { result: AnalysisResult }) {
 type Props = {
   result: AnalysisResult | null;
   selectedRegion: EvidenceRegion | null;
+  selectedRegionId: string | null;
   running: boolean;
   analysisError: string | null;
   onSelectRegion: (id: string) => void;
   onClose: () => void;
+  chatResetKey: number;
 };
 
 function modalityLabel(region: EvidenceRegion): string {
@@ -120,10 +122,12 @@ function claimLabel(region: EvidenceRegion): string {
 export function EvidenceInspector({
   result,
   selectedRegion,
+  selectedRegionId,
   running,
   analysisError,
   onSelectRegion,
   onClose,
+  chatResetKey,
 }: Props) {
   if (!result && !running && !analysisError) return null;
 
@@ -443,17 +447,21 @@ export function EvidenceInspector({
               result={result!}
               selectedRegion={selectedRegion}
             />
-            <RegionGeoChatConversation
-              sessionId={result!.session_id}
-              result={result!}
-              selectedRegion={selectedRegion}
-            />
           </div>
         ) : result && evidence.length > 0 ? (
           <p className="inspector-empty">Select a region on the map.</p>
         ) : null}
       </div>
       </div>
+
+      {result ? (
+        <WorkstationGeoChatDrawer
+          result={result}
+          selectedRegion={selectedRegion}
+          selectedRegionId={selectedRegionId}
+          chatResetKey={chatResetKey}
+        />
+      ) : null}
     </aside>
   );
 }

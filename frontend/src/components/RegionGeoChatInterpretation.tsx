@@ -108,7 +108,7 @@ export function RegionGeoChatInterpretation({ sessionId, result, selectedRegion 
 
       <button
         type="button"
-        className="btn btn--secondary mt-2"
+        className="geochat-send-btn mt-2"
         onClick={() => void handleInterpret()}
         disabled={loading || question.trim().length < 3}
         data-testid="region-interpretation-run"

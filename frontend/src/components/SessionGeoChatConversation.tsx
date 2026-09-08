@@ -10,21 +10,23 @@ import type {
 import { GeoChatDrawerShell } from "@/components/GeoChatDrawerShell";
 import { api } from "@/lib/api";
 import { normalizeAnalysisError } from "@/lib/errors";
-import { shouldShowRegionInterpretation } from "@/lib/regionInterpretation";
+import {
+  type GeoChatDrawerMode,
+  geoChatDrawerHint,
+  geoChatDrawerTitle,
+} from "@/lib/geoChatDrawer";
 import { regionChatProviderBadge, regionChatTurnRole } from "@/lib/regionChatLabels";
-import { geoChatDrawerHint, geoChatDrawerTitle } from "@/lib/geoChatDrawer";
 
 type Props = {
   sessionId: string;
   result: AnalysisResult;
-  selectedRegion: EvidenceRegion;
+  mode: GeoChatDrawerMode;
+  selectedRegion: EvidenceRegion | null;
+  selectedRegionId: string | null;
+  chatResetKey: number;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
 };
-
-function chatProviderBadge(chat: BiTemporalRegionChatResult): string {
-  return regionChatProviderBadge(chat);
-}
 
 function TurnHistory({ turns }: { turns: ConversationTurnRecord[] }) {
   if (turns.length === 0) return null;
@@ -42,10 +44,13 @@ function TurnHistory({ turns }: { turns: ConversationTurnRecord[] }) {
   );
 }
 
-export function RegionGeoChatConversation({
+export function SessionGeoChatConversation({
   sessionId,
   result,
+  mode,
   selectedRegion,
+  selectedRegionId,
+  chatResetKey,
   expanded,
   onExpandedChange,
 }: Props) {
@@ -59,19 +64,17 @@ export function RegionGeoChatConversation({
     setError(null);
     setLoading(false);
     setMessage("");
-  }, [selectedRegion.id, sessionId]);
+  }, [chatResetKey, mode, selectedRegionId, sessionId]);
 
-  if (!shouldShowRegionInterpretation(result, selectedRegion)) {
-    return null;
-  }
+  const waitingForRegion = mode === "bi_temporal_region" && !selectedRegion;
 
   async function handleSend() {
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed || waitingForRegion) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await api.chatChangeRegion(sessionId, selectedRegion.id, trimmed);
+      const response = await api.chatSession(sessionId, trimmed, selectedRegionId);
       setLatestChat(response.chat);
       setMessage("");
     } catch (err) {
@@ -82,7 +85,6 @@ export function RegionGeoChatConversation({
   }
 
   const turns = latestChat?.conversation.turns ?? [];
-  const mode = "bi_temporal_region" as const;
 
   return (
     <GeoChatDrawerShell
@@ -93,6 +95,12 @@ export function RegionGeoChatConversation({
       onSend={() => void handleSend()}
       loading={loading}
       error={error}
+      sendDisabled={waitingForRegion}
+      placeholder={
+        waitingForRegion
+          ? "Select a region to enable GeoChat…"
+          : "Ask GeoChat a follow-up question…"
+      }
       expanded={expanded}
       onExpandedChange={onExpandedChange}
     >
@@ -106,43 +114,17 @@ export function RegionGeoChatConversation({
             data-route={latestChat.route}
             data-provider={latestChat.provider}
           >
-            {chatProviderBadge(latestChat)}
+            {regionChatProviderBadge(latestChat)}
           </p>
           {latestChat.scope_limited ? (
             <p
               className="inspector-note inspector-note--warning"
               data-testid="region-chat-scope-limited"
             >
-              This conversation is limited to the selected region. Submit a new analysis to
-              investigate other areas.
+              This follow-up is limited to the current analysis result. Submit a new analysis to
+              explore further.
             </p>
           ) : null}
-          <dl className="m-0 mt-2">
-            <div className="inspector-metric-row">
-              <dt>Conversation</dt>
-              <dd>{latestChat.conversation_id.slice(0, 8)}…</dd>
-            </div>
-            <div className="inspector-metric-row">
-              <dt>Turn</dt>
-              <dd>{latestChat.turn_index + 1}</dd>
-            </div>
-            {!latestChat.scope_limited ? (
-              <>
-                <div className="inspector-metric-row">
-                  <dt>Route</dt>
-                  <dd data-testid="region-chat-route">{latestChat.route}</dd>
-                </div>
-                <div className="inspector-metric-row">
-                  <dt>Provider</dt>
-                  <dd>{latestChat.provider}</dd>
-                </div>
-                <div className="inspector-metric-row">
-                  <dt>Model</dt>
-                  <dd>{latestChat.model_name}</dd>
-                </div>
-              </>
-            ) : null}
-          </dl>
         </div>
       ) : null}
     </GeoChatDrawerShell>

@@ -48,6 +48,9 @@ def upload_root(tmp_path, monkeypatch):
     get_metadata_registry.cache_clear()
     get_uploaded_imagery_provider.cache_clear()
     get_geochat_vlm.cache_clear()
+    from app.adapters.llm.groq_service import get_groq_assistant
+
+    get_groq_assistant.cache_clear()
     session_store._conversations.clear()
     yield root
     session_store._conversations.clear()
@@ -118,7 +121,7 @@ async def test_first_chat_turn(client, upload_root):
     assert chat["turn_id"]
     assert chat["detector"] == "uploaded_bi_temporal"
     assert chat["provider"] == "development"
-    assert "[development mock" in chat["answer"]
+    assert "vegetation" in chat["answer"].lower() or "region" in chat["answer"].lower()
     assert chat["conversation"]["turns"][0]["user_message"].startswith("Why do you think")
     assert res.json()["data"]["trace_step"]["tool_name"] == "geochat_region_chat"
 
@@ -127,34 +130,34 @@ async def test_first_chat_turn(client, upload_root):
 
 
 @pytest.mark.asyncio
-async def test_follow_up_turn_includes_history(client, upload_root, monkeypatch):
+async def test_follow_up_turn_includes_history(client, upload_root):
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
-    captured: dict = {}
-
-    async def capture_composite(self, **kwargs):
-        captured["question"] = kwargs["question"]
-        return SingleImageVQAResult(
-            task=VQATask.SINGLE_IMAGE_VQA,
-            answer="Follow-up mock answer.",
-            model_name="development-mock-geochat",
-            model_version="0.0.0-dev",
-            provider=VQAProviderKind.DEVELOPMENT,
-            provenance="mock",
-            input_image_id=kwargs["composite_image_id"],
-            requested_modality="optical",
-        )
-
-    monkeypatch.setattr(DevelopmentGeoChatVLM, "run_composite_vqa", capture_composite)
-    get_geochat_vlm.cache_clear()
 
     first = await _chat(client, session_id, region_id, "What changed here?")
     assert first.status_code == 200
     second = await _chat(client, session_id, region_id, "Can you explain the edges?")
     assert second.status_code == 200
     assert second.json()["data"]["chat"]["turn_index"] == 1
-    assert len(second.json()["data"]["chat"]["conversation"]["turns"]) == 2
-    assert "User: What changed here?" in captured.get("question", "")
-    assert "Assistant:" in captured.get("question", "")
+    turns = second.json()["data"]["chat"]["conversation"]["turns"]
+    assert len(turns) == 2
+    assert turns[0]["user_message"] == "What changed here?"
+    assert turns[1]["user_message"] == "Can you explain the edges?"
+    assert turns[0]["assistant_answer"] != turns[1]["assistant_answer"]
+
+
+@pytest.mark.asyncio
+async def test_hello_is_conversational_not_analysis_template(client, upload_root):
+    session_id, region_id = await _submit_bi_temporal(client, upload_root)
+    before = await client.get(f"/api/v1/query/{session_id}/result")
+    analysis_answer = before.json()["data"]["answer"]
+
+    res = await _chat(client, session_id, region_id, "hello")
+    assert res.status_code == 200
+    chat = res.json()["data"]["chat"]
+    assert chat["route"] == "general"
+    assert chat["provider"] == "groq"
+    assert chat["answer"] != analysis_answer
+    assert "Found 3 significant spectral change regions" not in chat["answer"]
 
 
 @pytest.mark.asyncio
@@ -255,10 +258,11 @@ async def test_out_of_scope_message_is_scope_limited(client, upload_root):
 async def test_geochat_service_unavailable(client, upload_root, monkeypatch):
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
 
-    async def fail_composite(self, **kwargs):
-        raise SatQueryError("geochat_service_error", "Service down.", status_code=502)
+    class FailingServiceVLM:
+        async def run_composite_vqa(self, **kwargs):
+            raise SatQueryError("geochat_service_error", "Service down.", status_code=502)
 
-    monkeypatch.setattr(DevelopmentGeoChatVLM, "run_composite_vqa", fail_composite)
+    monkeypatch.setattr("app.services.region_chat.get_geochat_vlm", lambda: FailingServiceVLM())
     get_geochat_vlm.cache_clear()
 
     res = await _chat(client, session_id, region_id, "Explain this change")
@@ -270,10 +274,11 @@ async def test_geochat_service_unavailable(client, upload_root, monkeypatch):
 async def test_geochat_timeout(client, upload_root, monkeypatch):
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
 
-    async def timeout_composite(self, **kwargs):
-        raise SatQueryError("geochat_service_timeout", "Timed out.", status_code=504)
+    class TimeoutServiceVLM:
+        async def run_composite_vqa(self, **kwargs):
+            raise SatQueryError("geochat_service_timeout", "Timed out.", status_code=504)
 
-    monkeypatch.setattr(DevelopmentGeoChatVLM, "run_composite_vqa", timeout_composite)
+    monkeypatch.setattr("app.services.region_chat.get_geochat_vlm", lambda: TimeoutServiceVLM())
     get_geochat_vlm.cache_clear()
 
     res = await _chat(client, session_id, region_id, "Explain this change")
@@ -285,14 +290,15 @@ async def test_geochat_timeout(client, upload_root, monkeypatch):
 async def test_geochat_malformed_response(client, upload_root, monkeypatch):
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
 
-    async def empty_composite(self, **kwargs):
-        raise SatQueryError(
-            "geochat_malformed_response",
-            "GeoChat inference service returned an empty or missing answer.",
-            status_code=502,
-        )
+    class MalformedServiceVLM:
+        async def run_composite_vqa(self, **kwargs):
+            raise SatQueryError(
+                "geochat_malformed_response",
+                "GeoChat inference service returned an empty or missing answer.",
+                status_code=502,
+            )
 
-    monkeypatch.setattr(DevelopmentGeoChatVLM, "run_composite_vqa", empty_composite)
+    monkeypatch.setattr("app.services.region_chat.get_geochat_vlm", lambda: MalformedServiceVLM())
     get_geochat_vlm.cache_clear()
 
     res = await _chat(client, session_id, region_id, "Explain this change")

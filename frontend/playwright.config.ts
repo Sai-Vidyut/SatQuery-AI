@@ -27,7 +27,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "cd ../backend && IMAGERY_PROVIDER=development CHANGE_DETECTOR=development SEMANTIC_ANALYZER=development SAR_CHANGE_DETECTOR=development QUERY_PLANNER=deterministic GEOCHAT_VQA_PROVIDER=development UPLOAD_CHANGE_DETECTOR=bi_temporal PYTHONPATH=.:.pip_packages /opt/homebrew/bin/python3.11 -m uvicorn app.main:app --host 127.0.0.1 --port 8001",
+        "cd ../backend && IMAGERY_PROVIDER=development CHANGE_DETECTOR=development SEMANTIC_ANALYZER=development SAR_CHANGE_DETECTOR=development QUERY_PLANNER=deterministic GEOCHAT_VQA_PROVIDER=development GROQ_PROVIDER=development UPLOAD_CHANGE_DETECTOR=bi_temporal PYTHONPATH=.:.pip_packages /opt/homebrew/bin/python3.11 -m uvicorn app.main:app --host 127.0.0.1 --port 8001",
       url: `${API_URL}/health`,
       reuseExistingServer: true,
       timeout: 120_000,

@@ -3,17 +3,29 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.vqa import VQAProviderKind
+
+class RegionChatProviderKind(str, Enum):
+    DEVELOPMENT = "development"
+    GEOCHAT_SERVICE = "geochat_service"
+    GROQ = "groq"
 
 
 class RegionChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str = Field(min_length=1, max_length=4000)
+
+
+class SessionChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4000)
+    region_id: str | None = None
 
 
 class ConversationTurnRecord(BaseModel):
@@ -24,6 +36,9 @@ class ConversationTurnRecord(BaseModel):
     user_message: str
     assistant_answer: str
     created_at: datetime
+    route: Literal["geo", "general"] | None = None
+    provider: RegionChatProviderKind | None = None
+    scope: Literal["selected_region", "general_assistant"] | None = None
 
 
 class RegionConversationRecord(BaseModel):
@@ -56,13 +71,20 @@ class BiTemporalRegionChatResult(BaseModel):
 
     model_name: str
     model_version: str
-    provider: VQAProviderKind
+    provider: RegionChatProviderKind
     provenance: str
     confidence_available: bool = False
     inference_metadata: dict[str, Any] = Field(default_factory=dict)
 
-    preview_bbox_wgs84: str
-    evidence_inputs: Literal["before_after_composite_crop"] = "before_after_composite_crop"
+    route: Literal["geo", "general"] = "geo"
+    classification: Literal["geo", "general", "ambiguous"] = "geo"
+    scope: Literal["selected_region", "general_assistant"] = "selected_region"
+    preview_bbox_wgs84: str = ""
+    evidence_inputs: Literal[
+        "before_after_composite_crop",
+        "general_assistant_no_imagery",
+        "analysis_summary_no_imagery",
+    ] = "before_after_composite_crop"
     scope_limited: bool = False
     conversation: RegionConversationRecord
 

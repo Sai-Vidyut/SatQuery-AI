@@ -9,7 +9,10 @@ from time import perf_counter
 
 from app.adapters.change.bi_temporal.validator import resolve_upload_path
 from app.adapters.imagery.uploaded.factory import get_uploaded_imagery_provider
+from app.adapters.llm.groq_service import get_groq_assistant
+from app.adapters.rsvlm.development import DevelopmentGeoChatVLM
 from app.adapters.rsvlm.factory import get_geochat_vlm
+from app.services.conversational_development import development_region_chat_reply
 from app.core.errors import SatQueryError
 from app.evidence.bi_temporal_interpretation import (
     CONFIDENCE_KIND,
@@ -20,9 +23,15 @@ from app.schemas.domain import AnalysisResult, EvidenceRegion, TraceStatus, Trac
 from app.schemas.region_chat import (
     BiTemporalRegionChatResult,
     ConversationTurnRecord,
+    RegionChatProviderKind,
     RegionConversationRecord,
 )
-from app.schemas.vqa import GeoChatVQAParameters, VQAProviderKind
+from app.schemas.vqa import GeoChatVQAParameters
+from app.services.region_chat_router import (
+    RegionChatClassification,
+    classify_region_chat_message,
+    is_out_of_scope_message,
+)
 from app.services.region_interpretation import (
     EVIDENCE_INPUTS,
     _find_region,
@@ -37,29 +46,12 @@ from app.storage.factory import get_image_storage
 MAX_CONVERSATION_TURNS = 10
 MAX_HISTORY_CHARS = 8000
 
-OUT_OF_SCOPE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\bfind (?:other|all|every|any)\b", re.I),
-    re.compile(r"\bwhole city\b", re.I),
-    re.compile(r"\banalyze the whole\b", re.I),
-    re.compile(r"\ball damaged\b", re.I),
-    re.compile(r"\bsomewhere else\b", re.I),
-    re.compile(r"\banother area\b", re.I),
-    re.compile(r"\bdifferent region\b", re.I),
-    re.compile(r"\bnew analysis\b", re.I),
-    re.compile(r"\bentire (?:scene|image|aoi|area|city)\b", re.I),
-    re.compile(r"\bwhat happened (?:elsewhere|outside)\b", re.I),
-)
-
 SCOPE_LIMITED_ANSWER = (
     "This conversation is limited to the already-detected region shown in the Before/After "
     "evidence. I cannot search for other changed areas, analyze the whole scene, or run a "
     "new detection from here. Submit a new analysis with a different question or AOI to "
     "investigate another area."
 )
-
-
-def is_out_of_scope_message(message: str) -> bool:
-    return any(pattern.search(message) for pattern in OUT_OF_SCOPE_PATTERNS)
 
 
 def _history_char_count(turns: list[ConversationTurn]) -> int:
@@ -155,6 +147,9 @@ def _conversation_record(conversation: RegionConversation) -> RegionConversation
                 user_message=turn.user_message,
                 assistant_answer=turn.assistant_answer,
                 created_at=turn.created_at,
+                route=turn.route,  # type: ignore[arg-type]
+                provider=RegionChatProviderKind(turn.provider) if turn.provider else None,
+                scope=turn.scope,  # type: ignore[arg-type]
             )
             for turn in conversation.turns
         ],
@@ -214,26 +209,17 @@ class RegionChatService:
         region = _find_region(result, region_id)
         conversation = self._store.get_or_create_conversation(session_id, region_id)
         _validate_history_limits(conversation)
-
         bt = result.bi_temporal_change
-        bbox = padded_bbox_from_geometry(region.geometry.model_dump())
-        bbox_param = format_preview_bbox(bbox)
-
-        upload_provider = get_uploaded_imagery_provider()
-        earlier = upload_provider.get(bt.earlier_image_id)
-        later = upload_provider.get(bt.later_image_id)
-        storage = get_image_storage()
-        earlier_path = resolve_upload_path(earlier, storage)
-        later_path = resolve_upload_path(later, storage)
-        composite_png = render_before_after_composite(
-            earlier_path,
-            later_path,
-            bbox_wgs84=bbox,
-        )
+        assert bt is not None
 
         prior_turns = list(conversation.turns)
         turn_index = len(prior_turns)
         turn_id = str(uuid.uuid4())
+        route_decision = classify_region_chat_message(
+            cleaned,
+            region_id=region_id,
+            prior_turns=prior_turns,
+        )
         step_id = f"geochat_region_chat-{len(session.trace) + 1}"
         started = datetime.now(UTC)
         t0 = perf_counter()
@@ -243,63 +229,141 @@ class RegionChatService:
             tool_name="geochat_region_chat",
             status=TraceStatus.RUNNING,
             started_at=started,
-            summary="Running evidence-scoped GeoChat conversation…",
+            summary="Running region chat turn…",
             metadata={
                 "session_id": session_id,
                 "region_id": region_id,
                 "conversation_id": conversation.conversation_id,
                 "turn_id": turn_id,
                 "turn_index": turn_index,
-                "evidence_inputs": EVIDENCE_INPUTS,
-                "preview_bbox_wgs84": bbox_param,
+                "route": route_decision.route,
+                "classification": route_decision.classification.value,
             },
         )
         session.trace.append(step)
 
-        scope_limited = is_out_of_scope_message(cleaned)
+        scope_limited = False
+        route = route_decision.route
+        classification = route_decision.classification.value
+        scope = "general_assistant" if route == "general" else "selected_region"
+        evidence_inputs: str = EVIDENCE_INPUTS
+        bbox_param = ""
         try:
-            if scope_limited:
-                vlm = get_geochat_vlm()
-                answer = SCOPE_LIMITED_ANSWER
-                provider_kind = VQAProviderKind(vlm.provider_kind)
-                model_name = "satquery-scope-guard"
-                model_version = "1.0.0"
-                provenance = "SatQuery region scope guard — no new detection performed."
+            if route == "general":
+                groq = get_groq_assistant()
+                groq_result = await groq.complete(cleaned, prior_turns=prior_turns)
+                answer = groq_result.answer
+                provider_kind = RegionChatProviderKind.GROQ
+                model_name = groq_result.model_name
+                model_version = groq_result.model_version
+                provenance = groq_result.provenance
+                evidence_inputs = "general_assistant_no_imagery"
                 inference_metadata = {
-                    "scope_guard": True,
+                    **groq_result.inference_metadata,
+                    "route": route,
+                    "classification": classification,
+                    "scope": scope,
+                    "scope_guard": False,
                     "geochat_called": False,
-                    "evidence_inputs": EVIDENCE_INPUTS,
-                    "preview_bbox_wgs84": bbox_param,
+                    "groq_called": True,
+                    "evidence_inputs": evidence_inputs,
                 }
             else:
-                prompt = build_region_chat_prompt(
-                    region=region,
-                    result=result,
-                    message=cleaned,
-                    prior_turns=prior_turns,
+                bbox = padded_bbox_from_geometry(region.geometry.model_dump())
+                bbox_param = format_preview_bbox(bbox)
+                upload_provider = get_uploaded_imagery_provider()
+                earlier = upload_provider.get(bt.earlier_image_id)
+                later = upload_provider.get(bt.later_image_id)
+                storage = get_image_storage()
+                earlier_path = resolve_upload_path(earlier, storage)
+                later_path = resolve_upload_path(later, storage)
+                composite_png = render_before_after_composite(
+                    earlier_path,
+                    later_path,
+                    bbox_wgs84=bbox,
                 )
-                vlm = get_geochat_vlm()
-                vqa_result = await vlm.run_composite_vqa(
-                    composite_png=composite_png,
-                    question=prompt,
-                    parameters=GeoChatVQAParameters(),
-                    composite_image_id=f"{session_id}:{region_id}:{conversation.conversation_id}",
-                    modality=str(region.metadata.get("evidence_modality") or "optical"),
-                )
-                answer = vqa_result.answer
-                provider_kind = vqa_result.provider
-                model_name = vqa_result.model_name
-                model_version = vqa_result.model_version
-                provenance = vqa_result.provenance
-                inference_metadata = {
-                    **vqa_result.inference_metadata,
-                    "scope_guard": False,
-                    "geochat_called": True,
+                step.metadata = {
+                    **(step.metadata or {}),
                     "evidence_inputs": EVIDENCE_INPUTS,
                     "preview_bbox_wgs84": bbox_param,
-                    "composite_bytes": len(composite_png),
-                    "turn_index": turn_index,
                 }
+
+                scope_limited = is_out_of_scope_message(cleaned)
+                if scope_limited:
+                    vlm = get_geochat_vlm()
+                    answer = SCOPE_LIMITED_ANSWER
+                    provider_kind = RegionChatProviderKind(vlm.provider_kind)
+                    model_name = "satquery-scope-guard"
+                    model_version = "1.0.0"
+                    provenance = "SatQuery region scope guard — no new detection performed."
+                    inference_metadata = {
+                        "route": route,
+                        "classification": classification,
+                        "scope": scope,
+                        "scope_guard": True,
+                        "geochat_called": False,
+                        "groq_called": False,
+                        "evidence_inputs": EVIDENCE_INPUTS,
+                        "preview_bbox_wgs84": bbox_param,
+                    }
+                else:
+                    prompt = build_region_chat_prompt(
+                        region=region,
+                        result=result,
+                        message=cleaned,
+                        prior_turns=prior_turns,
+                    )
+                    vlm = get_geochat_vlm()
+                    if isinstance(vlm, DevelopmentGeoChatVLM):
+                        answer = development_region_chat_reply(
+                            message=prompt,
+                            region=region,
+                            result=result,
+                            prior_turns=prior_turns,
+                        )
+                        provider_kind = RegionChatProviderKind.DEVELOPMENT
+                        model_name = "development-mock-geochat"
+                        model_version = "0.0.0-dev"
+                        provenance = "Development mock region chat — conversational, not analysis re-submission."
+                        inference_metadata = {
+                            "route": route,
+                            "classification": classification,
+                            "scope": scope,
+                            "scope_guard": False,
+                            "geochat_called": True,
+                            "groq_called": False,
+                            "development_mock": True,
+                            "evidence_inputs": EVIDENCE_INPUTS,
+                            "preview_bbox_wgs84": bbox_param,
+                            "composite_bytes": len(composite_png),
+                            "turn_index": turn_index,
+                        }
+                    else:
+                        vqa_result = await vlm.run_composite_vqa(
+                            composite_png=composite_png,
+                            question=prompt,
+                            parameters=GeoChatVQAParameters(),
+                            composite_image_id=f"{session_id}:{region_id}:{conversation.conversation_id}",
+                            modality=str(region.metadata.get("evidence_modality") or "optical"),
+                        )
+                        answer = vqa_result.answer
+                        provider_kind = RegionChatProviderKind(vqa_result.provider.value)
+                        model_name = vqa_result.model_name
+                        model_version = vqa_result.model_version
+                        provenance = vqa_result.provenance
+                        inference_metadata = {
+                            **vqa_result.inference_metadata,
+                            "route": route,
+                            "classification": classification,
+                            "scope": scope,
+                            "scope_guard": False,
+                            "geochat_called": True,
+                            "groq_called": False,
+                            "evidence_inputs": EVIDENCE_INPUTS,
+                            "preview_bbox_wgs84": bbox_param,
+                            "composite_bytes": len(composite_png),
+                            "turn_index": turn_index,
+                        }
         except SatQueryError as exc:
             step.status = TraceStatus.FAILED
             step.completed_at = datetime.now(UTC)
@@ -321,6 +385,9 @@ class RegionChatService:
                 turn_index=turn_index,
                 user_message=cleaned,
                 assistant_answer=answer,
+                route=route,
+                provider=provider_kind.value,
+                scope=scope,
             ),
         )
         updated_conversation = self._store.get_conversation(session_id, region_id)
@@ -355,8 +422,11 @@ class RegionChatService:
             provenance=provenance,
             confidence_available=False,
             inference_metadata=inference_metadata,
+            route=route,  # type: ignore[arg-type]
+            classification=classification,  # type: ignore[arg-type]
+            scope=scope,  # type: ignore[arg-type]
             preview_bbox_wgs84=bbox_param,
-            evidence_inputs=EVIDENCE_INPUTS,
+            evidence_inputs=evidence_inputs,  # type: ignore[arg-type]
             scope_limited=scope_limited,
             conversation=_conversation_record(updated_conversation),
         )
@@ -364,7 +434,11 @@ class RegionChatService:
         step.status = TraceStatus.COMPLETED
         step.completed_at = datetime.now(UTC)
         step.duration_ms = elapsed
-        step.summary = "GeoChat region conversation turn completed."
+        step.summary = (
+            "General assistant turn completed."
+            if route == "general"
+            else "GeoChat region conversation turn completed."
+        )
         step.metadata = {
             **(step.metadata or {}),
             "provider": provider_kind.value,
@@ -373,6 +447,10 @@ class RegionChatService:
             "status": TraceStatus.COMPLETED.value,
             "duration_ms": elapsed,
             "scope_limited": scope_limited,
+            "route": route,
+            "classification": classification,
+            "scope": scope,
+            "evidence_inputs": evidence_inputs,
         }
         return chat_result, step
 

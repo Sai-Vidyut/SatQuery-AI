@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Map } from "maplibre-gl";
-import type { AnalysisResult, AOI, ImageInput } from "@/types/domain";
+import type { AnalysisResult, AOI, ImageInput, QueryRequest } from "@/types/domain";
 import { api } from "@/lib/api";
 import { parseIsoDate, validateDateRange } from "@/lib/dates";
 import { createAnalysisRequestSequence } from "@/lib/analysisRequestSequence";
@@ -110,6 +110,7 @@ export function Workspace() {
   const [pairValidationStatus, setPairValidationStatus] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState({ detections: true, aoi: true });
   const [tourActive, setTourActive] = useState(false);
+  const [chatResetKey, setChatResetKey] = useState(0);
 
   useEffect(() => {
     if (urlHydratedRef.current) return;
@@ -397,6 +398,7 @@ export function Workspace() {
         : "?";
       setResult(data.result);
       setLastResult(data.result);
+      setChatResetKey((key) => key + 1);
       if (data.result.cross_modal) {
         setStatusLine(
           `Cross-modal · ${data.result.cross_modal.fused_analysis.fused_region_count} fused regions · ${elapsed}s`,
@@ -561,9 +563,11 @@ export function Workspace() {
         <EvidenceInspector
           result={result}
           selectedRegion={selectedRegion}
+          selectedRegionId={selectedRegionId}
           running={running}
           analysisError={analysisError}
           onSelectRegion={(id) => handleSelectRegion(id)}
+          chatResetKey={chatResetKey}
           onClose={() => {
             if (running) return;
             if (result) setLastResult(result);

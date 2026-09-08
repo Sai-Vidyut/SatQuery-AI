@@ -3,7 +3,8 @@ from fastapi.responses import Response
 
 from app.core.responses import ApiResponse, SubmitQueryData, success
 from app.schemas.domain import AnalysisResult, QueryRequest, TraceStep
-from app.schemas.region_chat import RegionChatData, RegionChatRequest
+from app.schemas.region_chat import RegionChatData, RegionChatRequest, SessionChatRequest
+from app.services.session_chat import session_chat_service
 from app.schemas.region_interpretation import InterpretRegionData, RegionInterpretationRequest
 from app.schemas.region_ranking import BiTemporalRegionRankingResult
 from app.services.query_controller import query_controller
@@ -90,6 +91,27 @@ async def chat_region(
         session_id,
         region_id,
         request.message,
+    )
+    return success(
+        RegionChatData(
+            chat=chat,
+            trace_step=trace_step.model_dump(mode="json"),
+        )
+    )
+
+
+@router.post(
+    "/{session_id}/chat",
+    response_model=ApiResponse[RegionChatData],
+)
+async def chat_session(
+    session_id: str,
+    request: SessionChatRequest,
+) -> ApiResponse[RegionChatData]:
+    chat, trace_step = await session_chat_service.chat(
+        session_id,
+        request.message,
+        region_id=request.region_id,
     )
     return success(
         RegionChatData(

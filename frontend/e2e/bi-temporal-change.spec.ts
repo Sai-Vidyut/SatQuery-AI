@@ -100,6 +100,12 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   await expect(page.getByTestId("inspector-bitemporal-provenance")).toBeVisible();
   await expect(page.getByTestId("inspector-change-summary")).not.toBeEmpty();
 
+  await expect(page.getByTestId("inspector-chat-drawer")).toHaveClass(/inspector-chat-drawer--collapsed/);
+  await expect(page.getByTestId("region-chat-open")).toBeVisible();
+  await expect(page.getByText("Ask GeoChat about this region")).toBeVisible();
+  await expect(page.getByTestId("region-chat-message")).toHaveCount(0);
+  await expect(page.getByTestId("before-after-evidence")).toBeVisible();
+
   await expect(page.getByTestId("region-geochat-interpretation")).toBeVisible();
   await page.getByTestId("region-interpretation-run").evaluate((node) => {
     (node as HTMLButtonElement).click();
@@ -111,8 +117,43 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   );
   await expect(page.getByTestId("region-deterministic-detection")).toBeVisible();
   await expect(page.getByTestId("inspector-bitemporal-provenance")).toBeVisible();
+  await expect(page.getByTestId("region-chat-message")).toHaveCount(0);
 
-  await expect(page.getByTestId("region-geochat-conversation")).toBeVisible();
+  await page.getByTestId("region-chat-open").click();
+  await expect(page.getByTestId("inspector-chat-drawer")).toHaveClass(/inspector-chat-drawer--expanded/);
+  await expect(page.getByTestId("region-chat-message")).toBeVisible();
+  await expect(page.getByTestId("region-chat-send")).toBeVisible();
+  await expect(page.getByTestId("region-chat-resize-handle")).toBeVisible();
+  await expect(page.getByTestId("before-after-evidence")).toBeVisible();
+
+  const drawer = page.getByTestId("inspector-chat-drawer");
+  const heightBeforeResize = await drawer.evaluate((node) => node.getBoundingClientRect().height);
+  const resizeHandle = page.getByTestId("region-chat-resize-handle");
+  const handleBox = await resizeHandle.boundingBox();
+  if (!handleBox) throw new Error("Resize handle has no bounding box");
+
+  await page.getByTestId("region-chat-message").fill("hello");
+  const helloChatRequest = page.waitForResponse(
+    (response) =>
+      response.url().includes("/regions/") &&
+      response.url().endsWith("/chat") &&
+      response.request().method() === "POST" &&
+      response.ok(),
+  );
+  await page.getByTestId("region-chat-send").evaluate((node) => {
+    (node as HTMLButtonElement).click();
+  });
+  await helloChatRequest;
+  await expect(page.getByTestId("region-chat-history")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("region-chat-turn")).toHaveCount(1);
+  await expect(page.getByTestId("region-chat-turn").first()).toContainText("hello");
+  await expect(page.getByTestId("region-chat-turn").first()).not.toContainText(
+    "Found 3 significant spectral change regions",
+  );
+  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("General AI · Groq", {
+    timeout: 30_000,
+  });
+
   await page.getByTestId("region-chat-message").fill(
     "What visible change occurred between the two dates?",
   );
@@ -121,17 +162,62 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   });
   await expect(page.getByTestId("region-chat-loading")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("region-chat-history")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("DEVELOPMENT MOCK");
+  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("GeoChat · Region evidence");
+  await expect(page.getByTestId("region-chat-route")).toHaveText("geo");
+
+  await page.getByTestId("region-chat-message").fill("What is a binary search tree?");
+  await page.getByTestId("region-chat-send").evaluate((node) => {
+    (node as HTMLButtonElement).click();
+  });
+  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("General AI · Groq", {
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId("region-chat-route")).toHaveText("general");
 
   await page.getByTestId("region-chat-message").fill("Why do you think this is vegetation loss?");
   await page.getByTestId("region-chat-send").evaluate((node) => {
     (node as HTMLButtonElement).click();
   });
-  await expect(page.getByTestId("region-chat-turn")).toHaveCount(2, { timeout: 30_000 });
+  await expect(page.getByTestId("region-chat-turn")).toHaveCount(3, { timeout: 30_000 });
+  const turnAnswers = await page.getByTestId("region-chat-turn").locator(".region-chat__answer").allTextContents();
+  expect(new Set(turnAnswers).size).toBeGreaterThan(1);
+  await expect(page.getByTestId("inspector-chat-drawer")).toHaveClass(/inspector-chat-drawer--expanded/);
+
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y - 72, { steps: 10 });
+  await page.mouse.up();
+  const heightAfterExpand = await drawer.evaluate((node) => node.getBoundingClientRect().height);
+  expect(heightAfterExpand).toBeGreaterThan(heightBeforeResize);
+
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 72, { steps: 10 });
+  await page.mouse.up();
+  const heightAfterShrink = await drawer.evaluate((node) => node.getBoundingClientRect().height);
+  expect(heightAfterShrink).toBeLessThanOrEqual(heightAfterExpand);
+  if (heightAfterExpand > 260) {
+    await resizeHandle.focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    const heightAfterKeyboardShrink = await drawer.evaluate((node) => node.getBoundingClientRect().height);
+    expect(heightAfterKeyboardShrink).toBeLessThan(heightAfterExpand);
+  }
+  await expect(page.getByTestId("before-after-evidence")).toBeVisible();
 
   await page.getByTestId("region-chat-message").fill("Find every changed area in the city.");
   await page.getByTestId("region-chat-send").evaluate((node) => {
     (node as HTMLButtonElement).click();
   });
   await expect(page.getByTestId("region-chat-scope-limited")).toBeVisible({ timeout: 30_000 });
+
+  await page.getByTestId("region-chat-collapse").click();
+  await expect(page.getByTestId("inspector-chat-drawer")).toHaveClass(/inspector-chat-drawer--collapsed/);
+  await expect(page.getByTestId("region-chat-open")).toBeVisible();
+  await expect(page.getByTestId("region-chat-message")).toHaveCount(0);
+
+  await page.getByTestId("region-chat-open").click();
+  await expect(page.getByTestId("region-chat-history")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("region-chat-turn")).toHaveCount(5);
 });

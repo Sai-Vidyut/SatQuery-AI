@@ -132,6 +132,15 @@ export const api = {
       },
     ),
 
+  chatSession: (sessionId: string, message: string, regionId?: string | null) =>
+    request<RegionChatData>(`/api/v1/query/${sessionId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        ...(regionId ? { region_id: regionId } : {}),
+      }),
+    }),
+
   exportRegionEvidenceUrl: (sessionId: string, regionId: string) =>
     `${API_BASE}/api/v1/query/${sessionId}/regions/${encodeURIComponent(regionId)}/evidence`,
 
