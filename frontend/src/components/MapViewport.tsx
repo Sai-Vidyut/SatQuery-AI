@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useCallback, type MutableRefObject } from "react";
-import maplibregl, { type GeoJSONSource, type Map } from "maplibre-gl";
+import { useEffect, useRef, useCallback, useState, type MutableRefObject } from "react";
+import maplibregl, { type GeoJSONSource, type Map, type Marker } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import type { AOI, EvidenceRegion, GeoJSONGeometry } from "@/types/domain";
+import type { GroundViewPoint } from "@/lib/aoiGroundView";
 import { aoiFromBbox, bboxFromAoi, claimTypeColor, detectionFillOpacity, getAccentColor, normalizeBbox } from "@/lib/geo";
 import { bboxFromGeometry } from "@/lib/regionPreview";
 
@@ -67,10 +68,36 @@ type Props = {
   selectedRegionId: string | null;
   drawMode: boolean;
   layerVisibility: LayerVisibility;
+  groundViewPoints: GroundViewPoint[];
+  groundViewOpen: boolean;
   onAoiDrawn: (aoi: AOI) => void;
   onSelectRegion: (id: string | null) => void;
+  onGroundViewPointSelect: (point: GroundViewPoint) => void;
   mapRef?: MutableRefObject<Map | null>;
 };
+
+function createGroundViewMarkerElement(
+  point: GroundViewPoint,
+  onSelect: (point: GroundViewPoint) => void,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ground-view-marker";
+  button.dataset.testid = "ground-view-marker";
+  button.dataset.groundViewId = point.id;
+  button.setAttribute("aria-label", `Open Ground View: ${point.title}`);
+  button.innerHTML = `
+    <span class="ground-view-marker__photo" style="background-image:url('${point.imageUrl}')"></span>
+    <span class="ground-view-marker__label">Ground View</span>
+    <span class="ground-view-marker__title">${point.title}</span>
+  `;
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(point);
+  });
+  return button;
+}
 
 function draftFeatureFromBbox(bbox: [number, number, number, number]): FeatureCollection {
   const [minLon, minLat, maxLon, maxLat] = bbox;
@@ -103,8 +130,11 @@ export function MapViewport({
   selectedRegionId,
   drawMode,
   layerVisibility,
+  groundViewPoints,
+  groundViewOpen,
   onAoiDrawn,
   onSelectRegion,
+  onGroundViewPointSelect,
   mapRef: externalMapRef,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,6 +142,10 @@ export function MapViewport({
   const mapRef = externalMapRef ?? internalMapRef;
   const drawingRef = useRef(false);
   const drawStartRef = useRef<[number, number] | null>(null);
+  const groundViewMarkersRef = useRef<Marker[]>([]);
+  const onGroundViewPointSelectRef = useRef(onGroundViewPointSelect);
+  onGroundViewPointSelectRef.current = onGroundViewPointSelect;
+  const [mapStyleReady, setMapStyleReady] = useState(false);
   const onAoiDrawnRef = useRef(onAoiDrawn);
   onAoiDrawnRef.current = onAoiDrawn;
 
@@ -164,6 +198,7 @@ export function MapViewport({
       } catch (err) {
         console.warn("[map] Labels overlay unavailable; satellite imagery only.", err);
       }
+      setMapStyleReady(true);
 
       const accent = getAccentColor();
       map.addSource("aoi", {
@@ -238,6 +273,9 @@ export function MapViewport({
     });
 
     mapRef.current = map;
+    if (process.env.NODE_ENV !== "production") {
+      (window as unknown as { __satqueryMap?: Map }).__satqueryMap = map;
+    }
     requestAnimationFrame(() => map.resize());
 
     return () => {
@@ -484,11 +522,38 @@ export function MapViewport({
     );
   }, [selectedRegionId, evidence, mapRef]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapStyleReady) return;
+
+    const clearMarkers = () => {
+      groundViewMarkersRef.current.forEach((marker) => marker.remove());
+      groundViewMarkersRef.current = [];
+    };
+
+    clearMarkers();
+    if (groundViewOpen || drawMode || groundViewPoints.length === 0) {
+      return clearMarkers;
+    }
+
+    groundViewMarkersRef.current = groundViewPoints.map((point) => {
+      const element = createGroundViewMarkerElement(point, (selected) => {
+        onGroundViewPointSelectRef.current(selected);
+      });
+      return new maplibregl.Marker({ element, anchor: "bottom" })
+        .setLngLat([point.longitude, point.latitude])
+        .addTo(map);
+    });
+
+    return clearMarkers;
+  }, [drawMode, groundViewOpen, groundViewPoints, mapRef, mapStyleReady]);
+
   return (
     <div
       ref={containerRef}
       data-testid="map"
       data-draw-active={drawMode ? "true" : "false"}
+      data-ground-view-point-count={groundViewPoints.length}
       className="absolute inset-0 z-0 h-full w-full min-h-[50dvh]"
       role="application"
       aria-label="Satellite map"

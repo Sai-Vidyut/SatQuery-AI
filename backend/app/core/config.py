@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     geochat_service_url: str | None = None
     geochat_model_id: str = "MBZUAI/geochat-7B"
     geochat_service_timeout_s: float = 120.0
-    groq_provider: str = "groq_api"  # groq_api | development
+    groq_provider: str = "development"  # groq_api | development
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-20b"
     groq_timeout_s: float = 30.0

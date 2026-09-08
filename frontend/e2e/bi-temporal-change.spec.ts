@@ -106,17 +106,8 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   await expect(page.getByTestId("region-chat-message")).toHaveCount(0);
   await expect(page.getByTestId("before-after-evidence")).toBeVisible();
 
-  await expect(page.getByTestId("region-geochat-interpretation")).toBeVisible();
-  await page.getByTestId("region-interpretation-run").evaluate((node) => {
-    (node as HTMLButtonElement).click();
-  });
-  await expect(page.getByTestId("region-interpretation-loading")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByTestId("region-interpretation-success")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("region-interpretation-provider-badge")).toContainText(
-    "DEVELOPMENT MOCK",
-  );
+  await expect(page.getByTestId("region-deterministic-summary")).toBeVisible();
   await expect(page.getByTestId("region-deterministic-detection")).toBeVisible();
-  await expect(page.getByTestId("inspector-bitemporal-provenance")).toBeVisible();
   await expect(page.getByTestId("region-chat-message")).toHaveCount(0);
 
   await page.getByTestId("region-chat-open").click();
@@ -150,7 +141,7 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   await expect(page.getByTestId("region-chat-turn").first()).not.toContainText(
     "Found 3 significant spectral change regions",
   );
-  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("General AI · Groq", {
+  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("General AI · DEMO", {
     timeout: 30_000,
   });
 
@@ -162,14 +153,14 @@ test("bi-temporal pair change flow shows trace, result, and regions", async ({ p
   });
   await expect(page.getByTestId("region-chat-loading")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("region-chat-history")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("GeoChat · Region evidence");
+  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("GeoChat · DEVELOPMENT MOCK");
   await expect(page.getByTestId("region-chat-route")).toHaveText("geo");
 
   await page.getByTestId("region-chat-message").fill("What is a binary search tree?");
   await page.getByTestId("region-chat-send").evaluate((node) => {
     (node as HTMLButtonElement).click();
   });
-  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("General AI · Groq", {
+  await expect(page.getByTestId("region-chat-provider-badge")).toContainText("General AI · DEMO", {
     timeout: 30_000,
   });
   await expect(page.getByTestId("region-chat-route")).toHaveText("general");

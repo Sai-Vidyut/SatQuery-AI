@@ -36,13 +36,13 @@ function chat(overrides: Partial<BiTemporalRegionChatResult>): BiTemporalRegionC
 }
 
 describe("regionChatProviderBadge", () => {
-  it("shows GeoChat region evidence for geo routes", () => {
+  it("shows GeoChat development mock for geo routes", () => {
     expect(regionChatProviderBadge(chat({ route: "geo", provider: "development" }))).toBe(
-      "GeoChat · Region evidence",
+      "GeoChat · DEVELOPMENT MOCK",
     );
   });
 
-  it("shows Groq badge for general routes", () => {
+  it("shows demo badge for development general routes", () => {
     expect(
       regionChatProviderBadge(
         chat({
@@ -50,6 +50,21 @@ describe("regionChatProviderBadge", () => {
           provider: "groq",
           scope: "general_assistant",
           evidence_inputs: "general_assistant_no_imagery",
+          inference_metadata: { development_mock: true, groq_called: false },
+        }),
+      ),
+    ).toBe("General AI · DEMO");
+  });
+
+  it("shows Groq badge for real general routes", () => {
+    expect(
+      regionChatProviderBadge(
+        chat({
+          route: "general",
+          provider: "groq",
+          scope: "general_assistant",
+          evidence_inputs: "general_assistant_no_imagery",
+          inference_metadata: { development_mock: false, groq_called: true },
         }),
       ),
     ).toBe("General AI · Groq");

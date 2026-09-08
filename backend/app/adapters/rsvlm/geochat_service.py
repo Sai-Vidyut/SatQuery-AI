@@ -114,9 +114,16 @@ class GeoChatServiceVLM(RemoteSensingVLM):
 
     async def _post(self, path: str, payload: dict) -> dict:
         settings = get_settings()
+        headers: dict[str, str] = {}
+        if "ngrok" in self._base_url:
+            headers["ngrok-skip-browser-warning"] = "true"
         try:
             async with httpx.AsyncClient(timeout=settings.geochat_service_timeout_s) as client:
-                response = await client.post(f"{self._base_url}{path}", json=payload)
+                response = await client.post(
+                    f"{self._base_url}{path}",
+                    json=payload,
+                    headers=headers or None,
+                )
                 response.raise_for_status()
                 body = response.json()
                 if not isinstance(body, dict):

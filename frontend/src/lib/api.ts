@@ -1,6 +1,7 @@
 import type {
   AnalysisResult,
   ApiResponse,
+  GroundContextResult,
   ImageryRequest,
   ImageryResult,
   ImageModality,
@@ -113,6 +114,11 @@ export const api = {
 
   getResult: (sessionId: string) =>
     request<AnalysisResult>(`/api/v1/query/${sessionId}/result`),
+
+  fetchGroundContext: (sessionId: string, regionId: string) =>
+    request<GroundContextResult>(
+      `/api/v1/query/${sessionId}/regions/${encodeURIComponent(regionId)}/ground-context`,
+    ),
 
   interpretChangeRegion: (sessionId: string, regionId: string, question: string) =>
     request<InterpretRegionData>(

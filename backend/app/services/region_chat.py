@@ -9,7 +9,7 @@ from time import perf_counter
 
 from app.adapters.change.bi_temporal.validator import resolve_upload_path
 from app.adapters.imagery.uploaded.factory import get_uploaded_imagery_provider
-from app.adapters.llm.groq_service import get_groq_assistant
+from app.adapters.llm.groq_service import complete_general_assistant
 from app.adapters.rsvlm.development import DevelopmentGeoChatVLM
 from app.adapters.rsvlm.factory import get_geochat_vlm
 from app.services.conversational_development import development_region_chat_reply
@@ -45,6 +45,15 @@ from app.storage.factory import get_image_storage
 
 MAX_CONVERSATION_TURNS = 10
 MAX_HISTORY_CHARS = 8000
+
+GEOCHAT_DEMO_FALLBACK_CODES = frozenset(
+    {
+        "geochat_service_error",
+        "geochat_service_timeout",
+        "geochat_service_misconfigured",
+        "geochat_vqa_misconfigured",
+    }
+)
 
 SCOPE_LIMITED_ANSWER = (
     "This conversation is limited to the already-detected region shown in the Before/After "
@@ -250,8 +259,7 @@ class RegionChatService:
         bbox_param = ""
         try:
             if route == "general":
-                groq = get_groq_assistant()
-                groq_result = await groq.complete(cleaned, prior_turns=prior_turns)
+                groq_result = await complete_general_assistant(cleaned, prior_turns=prior_turns)
                 answer = groq_result.answer
                 provider_kind = RegionChatProviderKind.GROQ
                 model_name = groq_result.model_name
@@ -265,7 +273,7 @@ class RegionChatService:
                     "scope": scope,
                     "scope_guard": False,
                     "geochat_called": False,
-                    "groq_called": True,
+                    "groq_called": bool(groq_result.inference_metadata.get("groq_called")),
                     "evidence_inputs": evidence_inputs,
                 }
             else:
@@ -339,31 +347,63 @@ class RegionChatService:
                             "turn_index": turn_index,
                         }
                     else:
-                        vqa_result = await vlm.run_composite_vqa(
-                            composite_png=composite_png,
-                            question=prompt,
-                            parameters=GeoChatVQAParameters(),
-                            composite_image_id=f"{session_id}:{region_id}:{conversation.conversation_id}",
-                            modality=str(region.metadata.get("evidence_modality") or "optical"),
-                        )
-                        answer = vqa_result.answer
-                        provider_kind = RegionChatProviderKind(vqa_result.provider.value)
-                        model_name = vqa_result.model_name
-                        model_version = vqa_result.model_version
-                        provenance = vqa_result.provenance
-                        inference_metadata = {
-                            **vqa_result.inference_metadata,
-                            "route": route,
-                            "classification": classification,
-                            "scope": scope,
-                            "scope_guard": False,
-                            "geochat_called": True,
-                            "groq_called": False,
-                            "evidence_inputs": EVIDENCE_INPUTS,
-                            "preview_bbox_wgs84": bbox_param,
-                            "composite_bytes": len(composite_png),
-                            "turn_index": turn_index,
-                        }
+                        try:
+                            vqa_result = await vlm.run_composite_vqa(
+                                composite_png=composite_png,
+                                question=prompt,
+                                parameters=GeoChatVQAParameters(),
+                                composite_image_id=f"{session_id}:{region_id}:{conversation.conversation_id}",
+                                modality=str(region.metadata.get("evidence_modality") or "optical"),
+                            )
+                        except SatQueryError as exc:
+                            if exc.code not in GEOCHAT_DEMO_FALLBACK_CODES:
+                                raise
+                            answer = development_region_chat_reply(
+                                message=prompt,
+                                region=region,
+                                result=result,
+                                prior_turns=prior_turns,
+                            )
+                            provider_kind = RegionChatProviderKind.DEVELOPMENT
+                            model_name = "development-mock-geochat"
+                            model_version = "0.0.0-dev"
+                            provenance = (
+                                "Development mock region chat — GeoChat service unavailable for demo."
+                            )
+                            inference_metadata = {
+                                "route": route,
+                                "classification": classification,
+                                "scope": scope,
+                                "scope_guard": False,
+                                "geochat_called": False,
+                                "groq_called": False,
+                                "development_mock": True,
+                                "geochat_fallback": True,
+                                "geochat_error_code": exc.code,
+                                "evidence_inputs": EVIDENCE_INPUTS,
+                                "preview_bbox_wgs84": bbox_param,
+                                "composite_bytes": len(composite_png),
+                                "turn_index": turn_index,
+                            }
+                        else:
+                            answer = vqa_result.answer
+                            provider_kind = RegionChatProviderKind(vqa_result.provider.value)
+                            model_name = vqa_result.model_name
+                            model_version = vqa_result.model_version
+                            provenance = vqa_result.provenance
+                            inference_metadata = {
+                                **vqa_result.inference_metadata,
+                                "route": route,
+                                "classification": classification,
+                                "scope": scope,
+                                "scope_guard": False,
+                                "geochat_called": True,
+                                "groq_called": False,
+                                "evidence_inputs": EVIDENCE_INPUTS,
+                                "preview_bbox_wgs84": bbox_param,
+                                "composite_bytes": len(composite_png),
+                                "turn_index": turn_index,
+                            }
         except SatQueryError as exc:
             step.status = TraceStatus.FAILED
             step.completed_at = datetime.now(UTC)

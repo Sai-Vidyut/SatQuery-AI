@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from time import perf_counter
 
-from app.adapters.llm.groq_service import get_groq_assistant
+from app.adapters.llm.groq_service import complete_general_assistant
 from app.core.errors import SatQueryError
 from app.schemas.domain import TraceStatus, TraceStep
 from app.schemas.region_chat import BiTemporalRegionChatResult, RegionChatProviderKind
@@ -110,8 +110,7 @@ class SessionChatService:
 
         try:
             if route == "general":
-                groq = get_groq_assistant()
-                groq_result = await groq.complete(cleaned, prior_turns=prior_turns)
+                groq_result = await complete_general_assistant(cleaned, prior_turns=prior_turns)
                 answer = groq_result.answer
                 provider_kind = RegionChatProviderKind.GROQ
                 model_name = groq_result.model_name
@@ -123,7 +122,7 @@ class SessionChatService:
                     "classification": classification,
                     "scope": scope,
                     "geochat_called": False,
-                    "groq_called": True,
+                    "groq_called": bool(groq_result.inference_metadata.get("groq_called")),
                     "evidence_inputs": evidence_inputs,
                 }
             else:

@@ -35,9 +35,10 @@ async def test_general_question_routes_to_groq_development(client, upload_root, 
     assert chat["scope"] == "general_assistant"
     assert chat["evidence_inputs"] == "general_assistant_no_imagery"
     assert chat["scope_limited"] is False
-    assert chat["inference_metadata"]["groq_called"] is True
+    assert chat["inference_metadata"]["groq_called"] is False
+    assert chat["inference_metadata"]["development_mock"] is True
     assert chat["inference_metadata"]["geochat_called"] is False
-    assert "development mock" in chat["answer"].lower()
+    assert "hi" in chat["answer"].lower() or "hello" in chat["answer"].lower() or "general assistant" in chat["answer"].lower()
 
 
 @pytest.mark.asyncio
@@ -70,7 +71,7 @@ async def test_out_of_scope_geo_not_routed_to_groq(client, upload_root, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_groq_not_configured_returns_structured_error(client, upload_root, monkeypatch):
+async def test_groq_not_configured_falls_back_to_development_demo(client, upload_root, monkeypatch):
     monkeypatch.setenv("GROQ_PROVIDER", "groq_api")
     monkeypatch.setenv("GROQ_API_KEY", "")
     get_settings.cache_clear()
@@ -78,12 +79,16 @@ async def test_groq_not_configured_returns_structured_error(client, upload_root,
 
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
     res = await _chat(client, session_id, region_id, "What does HTTP 404 mean?")
-    assert res.status_code == 503
-    assert res.json()["error"]["code"] == "groq_not_configured"
+    assert res.status_code == 200
+    chat = res.json()["data"]["chat"]
+    assert chat["route"] == "general"
+    assert chat["inference_metadata"]["development_mock"] is True
+    assert chat["inference_metadata"]["groq_fallback"] is True
+    assert chat["inference_metadata"]["groq_called"] is False
 
 
 @pytest.mark.asyncio
-async def test_groq_timeout(client, upload_root, monkeypatch):
+async def test_groq_timeout_falls_back_to_development_demo(client, upload_root, monkeypatch):
     monkeypatch.setenv("GROQ_PROVIDER", "groq_api")
     monkeypatch.setenv("GROQ_API_KEY", "gsk_test_key")
     get_settings.cache_clear()
@@ -96,12 +101,14 @@ async def test_groq_timeout(client, upload_root, monkeypatch):
 
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
     res = await _chat(client, session_id, region_id, "Tell me a joke.")
-    assert res.status_code == 504
-    assert res.json()["error"]["code"] == "groq_service_timeout"
+    assert res.status_code == 200
+    chat = res.json()["data"]["chat"]
+    assert chat["inference_metadata"]["development_mock"] is True
+    assert chat["inference_metadata"]["groq_fallback"] is True
 
 
 @pytest.mark.asyncio
-async def test_geochat_failure_not_silent_groq_fallback(client, upload_root, monkeypatch):
+async def test_geochat_service_failure_falls_back_to_development_mock(client, upload_root, monkeypatch):
     from app.adapters.rsvlm.factory import get_geochat_vlm
 
     monkeypatch.setenv("GROQ_PROVIDER", "development")
@@ -117,8 +124,11 @@ async def test_geochat_failure_not_silent_groq_fallback(client, upload_root, mon
 
     session_id, region_id = await _submit_bi_temporal(client, upload_root)
     res = await _chat(client, session_id, region_id, "Explain the detected change.")
-    assert res.status_code == 502
-    assert res.json()["error"]["code"] == "geochat_service_error"
+    assert res.status_code == 200
+    chat = res.json()["data"]["chat"]
+    assert chat["provider"] == "development"
+    assert chat["inference_metadata"]["geochat_fallback"] is True
+    assert chat["inference_metadata"]["development_mock"] is True
 
 
 def test_classifier_distinguishes_geo_from_general():

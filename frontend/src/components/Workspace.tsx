@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map } from "maplibre-gl";
 import type { AnalysisResult, AOI, ImageInput, QueryRequest } from "@/types/domain";
 import { api } from "@/lib/api";
@@ -15,7 +15,13 @@ import { SiteMenu } from "@/components/SiteMenu";
 import { IconRail } from "@/components/IconRail";
 import { QueryComposer, type ComposerInputMode } from "@/components/QueryComposer";
 import { EvidenceInspector } from "@/components/EvidenceInspector";
+import { GroundViewOverlay } from "@/components/GroundViewOverlay";
 import { InspectorTourSlot, WorkstationTour } from "@/components/WorkstationTour";
+import {
+  generateAoiGroundViewPoints,
+  type GroundViewPoint,
+} from "@/lib/aoiGroundView";
+import { captureMapViewportState, restoreMapViewportState } from "@/lib/mapViewportState";
 
 const DEFAULT_EARLIER_DATE = "2024-12-01";
 const DEFAULT_LATER_DATE = "2025-03-01";
@@ -111,6 +117,11 @@ export function Workspace() {
   const [layerVisibility, setLayerVisibility] = useState({ detections: true, aoi: true });
   const [tourActive, setTourActive] = useState(false);
   const [chatResetKey, setChatResetKey] = useState(0);
+  const [groundViewOpen, setGroundViewOpen] = useState(false);
+  const [selectedGroundViewPoint, setSelectedGroundViewPoint] = useState<GroundViewPoint | null>(
+    null,
+  );
+  const mapSnapshotRef = useRef<ReturnType<typeof captureMapViewportState> | null>(null);
 
   useEffect(() => {
     if (urlHydratedRef.current) return;
@@ -456,6 +467,36 @@ export function Workspace() {
     [syncUrl],
   );
 
+  const groundViewPoints = useMemo(
+    () => (aoi ? generateAoiGroundViewPoints(aoi) : []),
+    [aoi],
+  );
+
+  const openGroundView = useCallback((point: GroundViewPoint) => {
+    const map = mapRef.current;
+    if (map) {
+      mapSnapshotRef.current = captureMapViewportState(map);
+    }
+    setSelectedGroundViewPoint(point);
+    setGroundViewOpen(true);
+  }, []);
+
+  const closeGroundView = useCallback(() => {
+    setGroundViewOpen(false);
+    setSelectedGroundViewPoint(null);
+    const map = mapRef.current;
+    const snapshot = mapSnapshotRef.current;
+    if (map && snapshot) {
+      requestAnimationFrame(() => {
+        map.resize();
+        requestAnimationFrame(() => {
+          restoreMapViewportState(map, snapshot);
+          mapSnapshotRef.current = null;
+        });
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (tourActive) return;
@@ -518,6 +559,8 @@ export function Workspace() {
           selectedRegionId={selectedRegionId}
           drawMode={drawMode}
           layerVisibility={layerVisibility}
+          groundViewPoints={groundViewPoints}
+          groundViewOpen={groundViewOpen}
           onAoiDrawn={(next) => {
             setAoi(next);
             setDrawMode(false);
@@ -525,6 +568,7 @@ export function Workspace() {
             syncUrl({ aoi: next });
           }}
           onSelectRegion={handleSelectRegion}
+          onGroundViewPointSelect={openGroundView}
           mapRef={mapRef}
         />
       </div>
@@ -584,6 +628,10 @@ export function Workspace() {
       )}
 
       <WorkstationTour inputMode={inputMode} onActiveChange={setTourActive} />
+
+      {groundViewOpen && selectedGroundViewPoint ? (
+        <GroundViewOverlay point={selectedGroundViewPoint} onClose={closeGroundView} />
+      ) : null}
 
       <QueryComposer
         inputMode={inputMode}

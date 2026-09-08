@@ -3,7 +3,7 @@
 import type { AnalysisResult, EvidenceRegion, FetchImageryMetadata, TraceStep } from "@/types/domain";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { BeforeAfterEvidenceViewer } from "@/components/BeforeAfterEvidenceViewer";
-import { RegionGeoChatInterpretation } from "@/components/RegionGeoChatInterpretation";
+import { RegionDeterministicSummary } from "@/components/RegionDeterministicSummary";
 import { WorkstationGeoChatDrawer } from "@/components/WorkstationGeoChatDrawer";
 import { DATA_SOURCE_BANNER_TEXT, getDataSourceBanner } from "@/lib/dataSourceLabels";
 import { claimTypeLabel } from "@/lib/geo";
@@ -442,11 +442,7 @@ export function EvidenceInspector({
             ) : null}
 
             <BeforeAfterEvidenceViewer result={result!} selectedRegion={selectedRegion} />
-            <RegionGeoChatInterpretation
-              sessionId={result!.session_id}
-              result={result!}
-              selectedRegion={selectedRegion}
-            />
+            <RegionDeterministicSummary result={result!} selectedRegion={selectedRegion} />
           </div>
         ) : result && evidence.length > 0 ? (
           <p className="inspector-empty">Select a region on the map.</p>

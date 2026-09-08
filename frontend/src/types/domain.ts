@@ -287,6 +287,50 @@ export interface RegionChatData {
   trace_step: TraceStep;
 }
 
+export type GroundSceneCategory =
+  | "vegetation_loss"
+  | "built_up_increase"
+  | "water_shrinkage"
+  | "flood"
+  | "generic_change";
+
+export interface GroundContextLocation {
+  latitude: number;
+  longitude: number;
+}
+
+export interface GroundContextScene {
+  category: GroundSceneCategory;
+  title: string;
+  description: string;
+  features: string[];
+}
+
+export interface GroundContextImage {
+  asset_id: string;
+  url: string;
+  alt: string;
+}
+
+export interface GroundContextProvenance {
+  provider: "mock_ground_context";
+  source_type: "mock";
+  status: "demonstration_data";
+  real_world_imagery: false;
+  disclosure: string;
+}
+
+export interface GroundContextResult {
+  session_id: string;
+  region_id: string;
+  location: GroundContextLocation;
+  heading: number;
+  capture_date: string;
+  scene: GroundContextScene;
+  image: GroundContextImage;
+  provenance: GroundContextProvenance;
+}
+
 export interface Metric {
   name: string;
   value: number | string;

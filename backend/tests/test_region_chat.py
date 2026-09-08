@@ -266,8 +266,11 @@ async def test_geochat_service_unavailable(client, upload_root, monkeypatch):
     get_geochat_vlm.cache_clear()
 
     res = await _chat(client, session_id, region_id, "Explain this change")
-    assert res.status_code == 502
-    assert res.json()["error"]["code"] == "geochat_service_error"
+    assert res.status_code == 200
+    chat = res.json()["data"]["chat"]
+    assert chat["provider"] == "development"
+    assert chat["inference_metadata"]["geochat_fallback"] is True
+    assert chat["inference_metadata"]["development_mock"] is True
 
 
 @pytest.mark.asyncio
@@ -282,8 +285,10 @@ async def test_geochat_timeout(client, upload_root, monkeypatch):
     get_geochat_vlm.cache_clear()
 
     res = await _chat(client, session_id, region_id, "Explain this change")
-    assert res.status_code == 504
-    assert res.json()["error"]["code"] == "geochat_service_timeout"
+    assert res.status_code == 200
+    chat = res.json()["data"]["chat"]
+    assert chat["provider"] == "development"
+    assert chat["inference_metadata"]["geochat_fallback"] is True
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -10,6 +11,17 @@ import httpx
 from app.core.config import get_settings
 from app.core.errors import SatQueryError
 from app.services.session_store import ConversationTurn
+
+_GREETING_RE = re.compile(r"^(hi|hello|hey|good (?:morning|afternoon|evening))\b", re.I)
+
+GROQ_DEMO_FALLBACK_CODES = frozenset(
+    {
+        "groq_not_configured",
+        "groq_service_timeout",
+        "groq_service_error",
+        "groq_misconfigured",
+    }
+)
 
 GROQ_API_BASE = "https://api.groq.com/openai/v1"
 
@@ -49,12 +61,20 @@ class DevelopmentGroqAssistant:
         prior_turns: list[ConversationTurn],
     ) -> GroqCompletionResult:
         settings = get_settings()
-        snippet = message.strip()[:120]
-        return GroqCompletionResult(
-            answer=(
+        cleaned = message.strip()
+        if _GREETING_RE.search(cleaned):
+            answer = (
+                "Hi! I'm the general assistant for SatQuery. I can help with everyday questions. "
+                "For questions about the selected satellite region or its evidence, ask GeoChat."
+            )
+        else:
+            snippet = cleaned[:120]
+            answer = (
                 f"[development mock — not Groq API] General assistant reply for: {snippet}. "
                 "This response is not grounded in satellite imagery."
-            ),
+            )
+        return GroqCompletionResult(
+            answer=answer,
             model_name=settings.groq_model,
             model_version="0.0.0-dev",
             provenance=GENERAL_ASSISTANT_PROVENANCE + " [development mock]",
@@ -150,6 +170,34 @@ class GroqApiAssistant:
                 "groq_called": True,
                 "development_mock": False,
                 "prior_turn_count": len(prior_turns),
+            },
+        )
+
+
+async def complete_general_assistant(
+    message: str,
+    *,
+    prior_turns: list[ConversationTurn],
+) -> GroqCompletionResult:
+    """Use Groq when configured; otherwise deterministic demo mock without surfacing provider errors."""
+    assistant = get_groq_assistant()
+    if isinstance(assistant, DevelopmentGroqAssistant):
+        return await assistant.complete(message, prior_turns=prior_turns)
+    try:
+        return await assistant.complete(message, prior_turns=prior_turns)
+    except SatQueryError as exc:
+        if exc.code not in GROQ_DEMO_FALLBACK_CODES:
+            raise
+        fallback = await DevelopmentGroqAssistant().complete(message, prior_turns=prior_turns)
+        return GroqCompletionResult(
+            answer=fallback.answer,
+            model_name=fallback.model_name,
+            model_version=fallback.model_version,
+            provenance=fallback.provenance,
+            inference_metadata={
+                **fallback.inference_metadata,
+                "groq_fallback": True,
+                "groq_error_code": exc.code,
             },
         )
 

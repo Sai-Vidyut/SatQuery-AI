@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Demonstration open-area ground context">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8c0d4"/>
+      <stop offset="100%" stop-color="#e3edf4"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky)"/>
+  <rect y="235" width="640" height="125" fill="#b7b09a"/>
+  <rect x="60" y="180" width="120" height="60" fill="#8d9399"/>
+  <rect x="390" y="195" width="160" height="45" fill="#7f858c"/>
+  <path d="M0 280 H640" stroke="#8f9488" stroke-width="8"/>
+  <text x="24" y="34" fill="#1f3340" font-family="system-ui,sans-serif" font-size="18" font-weight="600">DEMO · Open-area context</text>
+</svg>
