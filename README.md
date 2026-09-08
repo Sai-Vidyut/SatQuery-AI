@@ -1,180 +1,216 @@
 # SatQuery AI
 
-Evidence-driven multimodal satellite intelligence platform for Smart India Hackathon 2026.
+Ask questions about satellite imagery in plain language and get evidence-backed answers you can inspect on the map.
 
-## Architecture
+## Table of contents
 
-- **Backend:** FastAPI query controller, typed tool registry, evidence engine, adapter boundaries
-- **Frontend:** Next.js + MapLibre workstation (see `DESIGN.md`)
-- **Contracts:** Pydantic schemas (`backend/app/schemas/domain.py`) mirrored in TypeScript (`frontend/src/types/domain.ts`)
+- [Overview](#overview)
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Getting started](#getting-started)
+- [Usage](#usage)
+- [Team](#team)
 
-## Quick start
+## Overview
+
+SatQuery AI is a map-first geospatial intelligence workstation. Analysts, researchers, and demo operators can select an area of interest or upload imagery, ask a natural-language question, and receive a structured answer backed by traceable evidence—not a black-box summary.
+
+The platform supports multiple analysis paths: catalog-based change detection over an AOI and date range (via Google Earth Engine when credentialed, or deterministic development fixtures locally), single-image visual question answering and scene description on uploaded GeoTIFFs, bi-temporal before/after change analysis on image pairs, and joint optical + SAR cross-modal analysis.
+
+Each run produces an execution trace, a narrative answer, and—where applicable—map-linked evidence regions with confidence metrics you can explore in the Results panel.
+
+## Features
+
+- **Natural language querying (AOI + dates)** — Draw an area of interest, pick a date range, and ask questions about spectral change, construction, or radar-related patterns.
+- **Single-image upload (VQA & captioning)** — Upload a GeoTIFF/TIFF and ask a specific question, or request a general scene description.
+- **Temporal pair comparison** — Upload before/after images to detect and summarize change between two acquisition dates.
+- **Cross-modal analysis (optical + SAR)** — Upload optical and SAR imagery together for joint analysis and fused summaries.
+- **Evidence-backed results** — Answers include an execution trace, map-linked evidence regions, and per-region confidence where the pipeline produces them.
+- **Development mode (local / offline-friendly)** — Default `IMAGERY_PROVIDER=development` uses deterministic fixtures with clear labeling—no Earth Engine credentials required to run the full workstation flow locally.
+
+## Tech stack
+
+### Frontend
+
+- [Next.js](https://nextjs.org/) 15 (App Router)
+- [React](https://react.dev/) 19
+- [TypeScript](https://www.typescriptlang.org/) 5.7
+- [Tailwind CSS](https://tailwindcss.com/) 4
+- [MapLibre GL JS](https://maplibre.org/) 4.7
+- [@phosphor-icons/react](https://phosphoricons.com/) 2.1
 
 ### Backend
 
-Requires **Python 3.11+**.
+- [Python](https://www.python.org/) 3.11+
+- [FastAPI](https://fastapi.tiangolo.com/) 0.115+
+- [Uvicorn](https://www.uvicorn.org/)
+- [Pydantic](https://docs.pydantic.dev/) 2.10+
+- Optional: [Google Earth Engine Python API](https://developers.google.com/earth-engine) (`earth_engine` extra)
+
+### Services
+
+- **GeoChat inference service** (`services/geochat/`) — Standalone FastAPI service for GPU-backed single-image VQA and captioning (optional; local development uses a labeled mock provider).
+
+## Project structure
+
+```
+SatQuery-AI/
+├── backend/       # FastAPI API, evidence engine, imagery/change adapters, tests
+├── frontend/      # Next.js map workstation UI
+├── services/      # Standalone GeoChat GPU inference service
+├── docs/          # Acceptance procedures and phase documentation
+└── experiments/   # ML research and smoke tests (not imported by the app)
+```
+
+## Getting started
+
+### Prerequisites
+
+- **Node.js** 22+ (matches `@types/node` in the frontend)
+- **Python** 3.11+ (required by `backend/pyproject.toml`)
+- **npm** (bundled with Node.js)
+
+### Installation
+
+```bash
+git clone https://github.com/Sai-Vidyut/SatQuery-AI.git
+cd SatQuery-AI
+```
+
+**Backend**
 
 ```bash
 cd backend
-/opt/homebrew/bin/python3.11 -m venv .venv
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
 source .venv/bin/activate
-pip install fastapi uvicorn pydantic pydantic-settings httpx pytest pytest-asyncio
-PYTHONPATH=. pytest
-uvicorn app.main:app --reload --port 8000
+
+pip install -e ".[dev]"
+cp .env.example .env
 ```
 
-### Frontend
+**Frontend**
 
 ```bash
 cd frontend
 npm install
-SATQUERY_BACKEND_URL=http://127.0.0.1:8000 npm run dev
+cp .env.local.example .env.local
 ```
 
-Open http://localhost:3000. API requests proxy through Next.js to the backend (`next.config.js` rewrites).
+### Environment variables
 
-## APIs (Phase 1)
+Copy the example files and set values locally. **Never commit real secrets.**
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Service health and imagery provider mode |
-| POST | `/api/v1/imagery/fetch` | Fetch catalog imagery metadata (Earth Engine / development) |
-| POST | `/api/v1/imagery/upload` | Upload and validate user-provided GeoTIFF/TIFF (PNG/JPEG for benchmark datasets) |
-| GET | `/api/v1/imagery/{image_id}` | Retrieve normalized upload metadata |
-| POST | `/api/v1/imagery/validate-input` | Validate single / bi-temporal / optical+SAR input compatibility |
-| POST | `/api/v1/query/submit` | Run full analysis pipeline |
-| GET | `/api/v1/query/{session_id}/trace` | Execution trace |
-| GET | `/api/v1/query/{session_id}/result` | Stored analysis result |
-| POST | `/api/v1/analysis/detect-change` | Change detection only |
+**Backend** (`backend/.env`) — names only:
 
-## Development vs production data
+| Variable | Purpose |
+|----------|---------|
+| `IMAGERY_PROVIDER` | `development` (default) or `earth_engine` |
+| `CHANGE_DETECTOR` | Override change detector provider |
+| `SAR_CHANGE_DETECTOR` | Override SAR change detector provider |
+| `SEMANTIC_ANALYZER` | `development` or `earth_engine` |
+| `EARTH_ENGINE_PROJECT` | Google Cloud project ID (Earth Engine) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON |
+| `UPLOAD_DIR` | Local upload storage directory |
+| `MAX_UPLOAD_SIZE_MB` | Max upload file size |
+| `GEOCHAT_VQA_PROVIDER` | `development` or `geochat_service` |
+| `GEOCHAT_SERVICE_URL` | URL of the GeoChat GPU service |
+| `GEOCHAT_MODEL_ID` | Remote-sensing VLM model identifier |
+| `GEOCHAT_SERVICE_TIMEOUT_S` | GeoChat HTTP timeout (seconds) |
+| `QUERY_PLANNER` | `deterministic` or `llm` |
+| `OPENAI_API_KEY` | Optional, for LLM query planner |
+| `OPENAI_MODEL` | OpenAI model for planner |
 
-Default: `IMAGERY_PROVIDER=development`. Responses include `mode: "development"` and an explicit disclaimer message.
+**Frontend** (`frontend/.env.local`):
 
-For real Sentinel-2 imagery via Google Earth Engine, set `IMAGERY_PROVIDER=earth_engine` (see below).
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL (empty uses Next.js rewrites) |
+| `SATQUERY_BACKEND_URL` | Backend URL for Next.js dev rewrites (default `http://127.0.0.1:8000`) |
 
-## Input paths (Phase 8)
+### Run in development
 
-Upload + validate user imagery (`POST /api/v1/imagery/upload`). See `backend/app/schemas/input.py`.
-
-## Single-image VQA (Phase 10 — SIH mandatory)
-
-- Upload one GeoTIFF/TIFF (or benchmark PNG/JPEG) → ask a natural-language question → GeoChat-7B specialist
-- Workstation **Upload image** mode or `POST /api/v1/query/submit` with `{ query, image_id }`
-- Real inference: `GEOCHAT_VQA_PROVIDER=geochat_service` + GPU service (Phase 9B reference). Local dev uses labeled `development` mock.
-- Acceptance procedure: `docs/SIH_ACCEPTANCE_SINGLE_IMAGE_VQA.md`
-
-## Single-image scene description (Phase 11 — SIH mandatory)
-
-- Same upload path; planner routes scene-description queries to `single_image_caption` → `geochat_caption`
-- Example query: `Describe this satellite scene.`
-- Structured result in `AnalysisResult.caption` (distinct from VQA `answer`)
-- Acceptance procedure: `docs/SIH_ACCEPTANCE_SINGLE_IMAGE_SCENE_DESCRIPTION.md`
-
-## Bi-temporal change analysis (Phase 12 — SIH mandatory)
-
-- Upload two GeoTIFF/TIFF images with `acquisition_datetime` → ask a change question
-- Workstation **Temporal pair** mode or `POST /api/v1/query/submit` with `{ query, earlier_image_id, later_image_id }`
-- Reuses existing deterministic CVA on uploaded pair overlap (development path)
-- Acceptance procedure: `docs/SIH_ACCEPTANCE_BI_TEMPORAL_CHANGE.md`
-
-**Earth Engine path (unchanged):** AOI + dates → catalog provider → CVA / Dynamic World / SAR / fusion.
-
-**Upload path:** user file → local storage → `ImageInput` validation → VQA or scene caption via GeoChat RS-VLM adapter. Grounding and change-VQA are **not** implemented yet.
-
-Upload config: `UPLOAD_DIR` (default `data/uploads`), `MAX_UPLOAD_SIZE_MB` (default `256`).
-
-## Google Earth Engine setup (Phase 2A)
-
-### Prerequisites
-
-1. [Register for Earth Engine access](https://signup.earthengine.google.com/)
-2. A Google Cloud project with Earth Engine enabled
-3. Python 3.11+
-
-### Install
+**Terminal 1 — backend**
 
 ```bash
-pip install earthengine-api
-# or: pip install -e ".[earth_engine]"
+cd backend
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS / Linux
+
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Authenticate (choose one)
+Verify: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
-**Option A — interactive (local development):**
+**Terminal 2 — frontend**
 
 ```bash
-earthengine authenticate
+cd frontend
+npm run dev
 ```
 
-**Option B — service account (recommended for servers):**
+Open [http://localhost:3000](http://localhost:3000). API requests proxy to the backend via `next.config.js` rewrites.
 
-1. Create a service account in Google Cloud Console
-2. Register it for Earth Engine access
-3. Download the JSON key (never commit it)
-4. Set in `.env`:
+### Development mode (no live satellite catalog)
 
-```
-IMAGERY_PROVIDER=earth_engine
-EARTH_ENGINE_PROJECT=your-gcp-project-id
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
-```
-
-**Option C — Application Default Credentials:**
-
-```bash
-gcloud auth application-default login
-```
-
-### Configure SatQuery
+Default backend config uses deterministic development adapters:
 
 ```bash
 # backend/.env
-IMAGERY_PROVIDER=earth_engine
-CHANGE_DETECTOR=earth_engine
-EARTH_ENGINE_PROJECT=your-gcp-project-id
+IMAGERY_PROVIDER=development
+GEOCHAT_VQA_PROVIDER=development
 ```
 
-Restart the backend. Health endpoint will report `imagery_provider: "earth_engine"`, `change_detector: "earth_engine"`, and `mode: "production"`.
-
-### Scene selection policy
-
-Earth Engine provider uses deterministic anchor selection (policy v1.0.0):
-
-1. Filter `COPERNICUS/S2_SR_HARMONIZED` to AOI bounds and date range
-2. Filter `CLOUDY_PIXEL_PERCENTAGE < cloud_cover_max` (default 30%)
-3. Select start-anchor scene closest to `start_date` (tie: lowest cloud, then scene ID)
-4. Select end-anchor scene closest to `end_date` (same tie-breaks)
-5. Return unique scenes sorted by acquisition date
-
-`ImageryResult.platform_id` on each scene carries the EE asset path for downstream change detection.
-
-### Change detection (Earth Engine CVA)
-
-When `CHANGE_DETECTOR=earth_engine` (default follows `IMAGERY_PROVIDER`):
-
-1. Load before/after scenes by `platform_id` from the imagery pipeline
-2. Apply QA60 + SCL cloud/shadow masking
-3. Compute Euclidean change magnitude across bands B2, B3, B4, B8, B11, B12
-4. Threshold at fixed magnitude 800 (SR scale, policy v1.0.0)
-5. Vectorize connected components at 10 m; filter regions &lt; 500 m²
-6. Confidence derived from measured mean magnitude above threshold (not invented)
-
-`DeterministicChangeDetector` remains available for development mode.
-
-### Without Earth Engine credentials
-
-Keep `IMAGERY_PROVIDER=development`. The app runs with deterministic demo data clearly labeled as development mode. It never silently falls back when `earth_engine` is explicitly configured.
-
-## Tests
+Responses are clearly labeled as development or mock data. For real Sentinel-2 catalog analysis, install the Earth Engine extra and configure credentials:
 
 ```bash
-cd backend && pytest
-cd frontend && npm test
-cd frontend && npm run test:e2e  # requires backend + frontend running
+pip install -e ".[earth_engine]"
+# Then set IMAGERY_PROVIDER=earth_engine and authenticate Earth Engine
 ```
 
-## Documentation
+See the existing Earth Engine section in this repository's docs and `backend/.env.example` for authentication options.
 
-- `DESIGN.md` — authoritative UI specification
-- `AGENTS.md` — agent implementation guide
+### Optional: GeoChat GPU service
+
+For production single-image VQA/captioning with a GPU host, see `services/geochat/README.md`. Point the backend at the service with `GEOCHAT_VQA_PROVIDER=geochat_service` and `GEOCHAT_SERVICE_URL`.
+
+### Other commands
+
+```bash
+# Backend tests
+cd backend && pytest
+
+# Frontend unit tests
+cd frontend && npm test
+
+# Frontend E2E (requires backend + frontend running)
+cd frontend && npm run test:e2e
+
+# Production frontend build
+cd frontend && npm run build && npm start
+```
+
+## Usage
+
+1. **Open the workstation** at [http://localhost:3000](http://localhost:3000).
+2. **Choose a mode** in the composer: **AOI + dates**, **Upload image**, **Temporal pair**, or **Cross-modal**.
+3. **Provide inputs** — draw an AOI and set dates, or upload the required GeoTIFF/TIFF files (and acquisition dates for temporal pairs).
+4. **Ask your question** in plain language (e.g. *Show me significant new construction* or *What changed between these two dates?*).
+5. **Run analysis** and review the **Results** panel: execution trace, answer, evidence regions on the map, and region-level metrics when available.
+
+## Team
+
+Built at **SRMIST**:
+
+| Name | Role |
+|------|------|
+| **Sai Vidyut C** | Backend & AI Systems Lead |
+| **Josh Jiby** | Frontend & Product Experience Lead |
+| **Fathima Rinaya** | Product Strategy & Communication Lead |
+
+For deeper implementation notes, see `AGENTS.md` and `DESIGN.md` in this repository.
