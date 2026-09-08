@@ -3,14 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi.responses import Response
 from pydantic import TypeAdapter
 
+from app.adapters.change.bi_temporal.validator import resolve_upload_path
 from app.adapters.imagery.uploaded.compatibility import validate_analysis_input
 from app.adapters.imagery.uploaded.factory import get_uploaded_imagery_provider
 from app.adapters.imagery.uploaded.validation import validate_file_size
 from app.core.errors import SatQueryError
 from app.core.responses import ApiResponse, success
+from app.services.imagery_preview import parse_bbox_wgs84, render_raster_preview_png
+from app.storage.factory import get_image_storage
 from app.schemas.domain import ImageryRequest, ImageryResult
 from app.schemas.input import (
     AnalysisInput,
@@ -79,6 +83,21 @@ async def post_upload_imagery(
         benchmark_pair_id=benchmark_pair_id if benchmark_dataset and co_registered_benchmark_pair else None,
     )
     return success(UploadImageResponse(image=image))
+
+
+@router.get("/{image_id}/preview")
+async def get_uploaded_imagery_preview(
+    image_id: str,
+    bbox: str = Query(..., description="Crop bounds as minx,miny,maxx,maxy in WGS84 degrees"),
+    max_size: int = Query(default=512, ge=64, le=2048),
+) -> Response:
+    provider = get_uploaded_imagery_provider()
+    image = provider.get(image_id)
+    bbox_wgs84 = parse_bbox_wgs84(bbox)
+    storage = get_image_storage()
+    path = resolve_upload_path(image, storage)
+    png_bytes = render_raster_preview_png(path, bbox_wgs84=bbox_wgs84, max_size=max_size)
+    return Response(content=png_bytes, media_type="image/png")
 
 
 @router.get("/{image_id}", response_model=ApiResponse[UploadImageResponse])

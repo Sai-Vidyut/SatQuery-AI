@@ -8,6 +8,23 @@ from app.schemas.domain import AnalysisResult, AnalysisStatus, TraceStep, TraceS
 
 
 @dataclass
+class ConversationTurn:
+    turn_id: str
+    turn_index: int
+    user_message: str
+    assistant_answer: str
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+@dataclass
+class RegionConversation:
+    conversation_id: str
+    session_id: str
+    region_id: str
+    turns: list[ConversationTurn] = field(default_factory=list)
+
+
+@dataclass
 class QuerySession:
     session_id: str
     status: AnalysisStatus
@@ -21,6 +38,32 @@ class SessionStore:
 
     def __init__(self) -> None:
         self._sessions: dict[str, QuerySession] = {}
+        self._conversations: dict[str, RegionConversation] = {}
+
+    @staticmethod
+    def _conversation_key(session_id: str, region_id: str) -> str:
+        return f"{session_id}:{region_id}"
+
+    def get_conversation(self, session_id: str, region_id: str) -> RegionConversation | None:
+        return self._conversations.get(self._conversation_key(session_id, region_id))
+
+    def get_or_create_conversation(self, session_id: str, region_id: str) -> RegionConversation:
+        key = self._conversation_key(session_id, region_id)
+        existing = self._conversations.get(key)
+        if existing is not None:
+            return existing
+        conversation = RegionConversation(
+            conversation_id=str(uuid.uuid4()),
+            session_id=session_id,
+            region_id=region_id,
+        )
+        self._conversations[key] = conversation
+        return conversation
+
+    def append_turn(self, session_id: str, region_id: str, turn: ConversationTurn) -> RegionConversation:
+        conversation = self.get_or_create_conversation(session_id, region_id)
+        conversation.turns.append(turn)
+        return conversation
 
     def create(self) -> str:
         session_id = str(uuid.uuid4())

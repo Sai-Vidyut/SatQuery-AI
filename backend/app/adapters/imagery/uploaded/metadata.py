@@ -83,9 +83,16 @@ def _bounds_from_geotags(
     res_x = abs(scale_x)
     res_y = abs(scale_y)
     west = origin_x
-    north = origin_y
     east = origin_x + width * scale_x
-    south = origin_y + height * scale_y
+    # Model tiepoint maps pixel (0,0) to (origin_x, origin_y). For typical north-up
+    # GeoTIFFs, row index increases downward while latitude increases northward —
+    # align with rasterio bounds (origin_y is the northern edge when scale_y > 0).
+    if scale_y >= 0:
+        north = origin_y
+        south = origin_y - height * scale_y
+    else:
+        north = origin_y
+        south = origin_y + height * scale_y
     min_lon, max_lon = sorted((west, east))
     min_lat, max_lat = sorted((south, north))
     return [min_lon, min_lat, max_lon, max_lat], res_x, res_y
