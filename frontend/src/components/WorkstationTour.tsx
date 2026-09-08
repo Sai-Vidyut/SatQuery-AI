@@ -316,16 +316,18 @@ export function WorkstationTour({ inputMode, onActiveChange }: Props) {
   return (
     <>
       {!active ? (
-        <button
-          type="button"
-          className="workstation-tour-help glass"
-          data-testid="tour-help-trigger"
-          aria-label="Show workstation tour"
-          title="Show tour"
-          onClick={startTour}
-        >
-          <HelpCircle size={18} strokeWidth={2} aria-hidden="true" />
-        </button>
+        <div className="workstation-tour-help-wrap">
+          <button
+            type="button"
+            className="workstation-tour-help glass-light"
+            data-testid="tour-help-trigger"
+            aria-label="Show workstation tour"
+            title="Show tour"
+            onClick={startTour}
+          >
+            <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </div>
       ) : null}
 
       {active && currentStep ? (
