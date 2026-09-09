@@ -13,7 +13,7 @@ test.beforeAll(() => {
 });
 
 test("upload image scene description flow shows trace and caption", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/workstation");
 
   await page.getByTestId("composer-mode-upload").click();
 

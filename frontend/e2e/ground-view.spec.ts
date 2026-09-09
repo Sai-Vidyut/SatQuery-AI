@@ -73,7 +73,7 @@ test.describe("Ground View immersive preview", () => {
       }
     });
 
-    await page.goto("/", { waitUntil: "domcontentloaded", timeout: 120_000 });
+    await page.goto("/workstation", { waitUntil: "domcontentloaded", timeout: 120_000 });
 
     await drawAoiOnMap(page);
 
@@ -110,7 +110,7 @@ test.describe("Ground View immersive preview", () => {
   });
 
   test("Escape closes Ground View without changing AOI", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded", timeout: 120_000 });
+    await page.goto("/workstation", { waitUntil: "domcontentloaded", timeout: 120_000 });
     await drawAoiOnMap(page);
     await expect(page.locator(".ground-view-marker").first()).toBeVisible({ timeout: 15_000 });
 
@@ -123,7 +123,7 @@ test.describe("Ground View immersive preview", () => {
   });
 
   test("switching between two Ground View points updates metadata", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded", timeout: 120_000 });
+    await page.goto("/workstation", { waitUntil: "domcontentloaded", timeout: 120_000 });
     await drawAoiOnMap(page);
 
     const markers = page.locator(".ground-view-marker");

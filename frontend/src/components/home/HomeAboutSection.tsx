@@ -108,7 +108,7 @@ export function HomeAboutSection() {
             Open the workstation, upload or select imagery, and ask your first question in plain
             English.
           </p>
-          <Link href="/" className="responsive-hero-banner__cta home-about__cta-button">
+          <Link href="/workstation" className="responsive-hero-banner__cta home-about__cta-button">
             ENTER WORKSTATION
           </Link>
         </div>

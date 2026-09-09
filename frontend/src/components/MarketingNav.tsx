@@ -5,7 +5,7 @@ import { HomeNav } from "@/components/home/HomeNav";
 export function MarketingNav() {
   return (
     <>
-      <Link href="/home" className="marketing-nav__logo" data-testid="site-nav-brand">
+      <Link href="/" className="marketing-nav__logo" data-testid="site-nav-brand">
         <Image
           src="/LOGO.png"
           alt="SatQuery"

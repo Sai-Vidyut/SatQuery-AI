@@ -22,7 +22,7 @@ const DEFAULTS = {
   titleLine2: "Interactive Vision-Language Intelligence",
   description: "For Earth Observation",
   primaryButtonText: "ENTER WORKSTATION",
-  primaryButtonHref: "/",
+  primaryButtonHref: "/workstation",
   scrollHint: "SCROLL TO EXPLORE",
 } as const;
 

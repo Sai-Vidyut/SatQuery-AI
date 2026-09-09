@@ -12,14 +12,15 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/home", label: "Home", Icon: Home, testId: "site-nav-link-home" },
-  { href: "/", label: "Workstation", Icon: MapIcon, testId: "site-nav-link-workstation" },
+  { href: "/", label: "Home", Icon: Home, testId: "site-nav-link-home" },
+  { href: "/workstation", label: "Workstation", Icon: MapIcon, testId: "site-nav-link-workstation" },
   { href: "/tutorial", label: "Tutorial", Icon: BookOpen, testId: "site-nav-link-tutorial" },
   { href: "/credits", label: "Credits", Icon: Heart, testId: "site-nav-link-credits" },
 ] as const;
 
 function isActivePath(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
+  if (href === "/") return pathname === "/" || pathname === "/home";
+  if (href === "/workstation") return pathname === "/workstation";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

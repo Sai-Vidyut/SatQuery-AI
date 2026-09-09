@@ -14,7 +14,7 @@ test.beforeAll(() => {
 });
 
 test("cross-modal optical+SAR flow shows trace and joint analysis", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/workstation");
 
   await page.getByTestId("composer-mode-cross-modal").click();
 

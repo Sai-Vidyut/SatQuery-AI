@@ -7,8 +7,8 @@ import { SiteMenu } from "@/components/SiteMenu";
 
 export function GlobalNav() {
   const pathname = usePathname();
-  const isWorkstation = pathname === "/";
-  const isHome = pathname === "/home";
+  const isWorkstation = pathname === "/workstation";
+  const isHome = pathname === "/" || pathname === "/home";
   const isMarketing = pathname === "/tutorial" || pathname === "/credits";
 
   if (isHome || isWorkstation || isMarketing) {
@@ -18,7 +18,7 @@ export function GlobalNav() {
   return (
     <header className="site-nav-bar site-nav-bar--inverse">
       <div className="site-nav-bar__pill glass">
-        <Link href="/home" className="site-nav-bar__brand" data-testid="site-nav-brand">
+        <Link href="/" className="site-nav-bar__brand" data-testid="site-nav-brand">
           <Image
             src="/LOGO.png"
             alt="SatQuery"

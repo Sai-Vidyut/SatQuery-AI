@@ -25,7 +25,7 @@ export function HomeFooter() {
             <p className="home-footer__heading">Product</p>
             <ul className="home-footer__links">
               <li>
-                <Link href="/">Workstation</Link>
+                <Link href="/workstation">Workstation</Link>
               </li>
               <li>
                 <Link href="/tutorial">Tutorial</Link>

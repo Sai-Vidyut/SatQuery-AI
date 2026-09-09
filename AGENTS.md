@@ -110,7 +110,7 @@ AOI + dates + query → `POST /api/v1/query/submit` → fetch_imagery → detect
 - GeoChat-7B Colab smoke test (`experiments/phase9b_geochat/`) — verified 8-bit T4 load + genuine inference
 - Adaptation research (`experiments/phase9b_geochat_adaptation/`) — interface sketches only
 
-## Phase 10 (implemented — SIH mandatory single-image VQA)
+## Phase 10 (implemented — single-image VQA)
 
 - **Intent:** `single_image_vqa` via agentic planner when `QueryRequest.image_id` is set
 - **Specialist:** `tools/single_image/geochat_vqa.py` → `adapters/rsvlm/` (`development` mock | `geochat_service` HTTP GPU)
@@ -123,7 +123,7 @@ AOI + dates + query → `POST /api/v1/query/submit` → fetch_imagery → detect
 - Config: `GEOCHAT_VQA_PROVIDER`, `GEOCHAT_SERVICE_URL`, `GEOCHAT_MODEL_ID`
 - **Not implemented:** change-VQA, grounding, fine-tuning, reports, auth
 
-## Phase 11 (implemented — SIH mandatory single-image scene description)
+## Phase 11 (implemented — single-image scene description)
 
 - **Intent:** `single_image_caption` when `image_id` is set and query requests general scene description
 - **Specialist:** `tools/single_image/geochat_caption.py` → same `adapters/rsvlm/` provider (no duplicate GeoChat client)
@@ -134,7 +134,7 @@ AOI + dates + query → `POST /api/v1/query/submit` → fetch_imagery → detect
 - **Evidence:** no fabricated spatial regions, bounding boxes, or confidence
 - Acceptance: `docs/SIH_ACCEPTANCE_SINGLE_IMAGE_SCENE_DESCRIPTION.md`
 
-## Phase 12 (implemented — SIH mandatory bi-temporal change)
+## Phase 12 (implemented — bi-temporal change)
 
 - **Intent:** `bi_temporal_change_vqa` when `earlier_image_id` + `later_image_id` are set
 - **Validation:** Phase 8 `validate_bi_temporal()` with required acquisition dates
@@ -146,7 +146,7 @@ AOI + dates + query → `POST /api/v1/query/submit` → fetch_imagery → detect
 - **Evidence:** Real CVA regions on map; no fabricated masks
 - Acceptance: `docs/SIH_ACCEPTANCE_BI_TEMPORAL_CHANGE.md`
 
-## Phase 13 (implemented — SIH mandatory cross-modal optical + SAR)
+## Phase 13 (implemented — cross-modal optical + SAR)
 
 - **Intent:** `cross_modal_optical_sar` when `optical_image_id` + `sar_image_id` are set
 - **Validation:** Phase 8 `validate_optical_sar_pair()` — modality, overlap, honest co-registration status

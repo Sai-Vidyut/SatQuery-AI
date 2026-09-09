@@ -13,7 +13,7 @@ test.beforeAll(() => {
 });
 
 test("upload image VQA flow shows trace and answer", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/workstation");
 
   await page.getByTestId("composer-mode-upload").click();
 

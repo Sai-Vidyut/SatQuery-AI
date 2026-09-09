@@ -15,7 +15,7 @@ test.beforeAll(() => {
 
 test("bi-temporal pair change flow shows trace, result, and regions", async ({ page }) => {
   test.setTimeout(180_000);
-  await page.goto("/");
+  await page.goto("/workstation");
 
   await page.getByTestId("composer-mode-temporal-pair").click();
   await expect(page.getByTestId("composer-upload-earlier-trigger")).toBeVisible({

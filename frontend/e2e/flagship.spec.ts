@@ -25,7 +25,7 @@ async function drawAoiOnMap(page: import("@playwright/test").Page) {
 
 test.describe("SatQuery flagship flow", () => {
   test("AOI draw, dates, query, trace, regions, confidence, map visible", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/workstation");
 
     await expect(page.getByTestId("map")).toBeAttached();
     await expect(page.getByTestId("inspector")).toHaveCount(0);
@@ -125,7 +125,7 @@ test.describe("SatQuery flagship flow", () => {
   });
 
   test("bbox keyboard fallback sets AOI", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/workstation");
     await expect(page.locator(".maplibregl-canvas")).toBeVisible({ timeout: 20_000 });
 
     await page.getByTestId("aoi-status").click();
@@ -136,14 +136,14 @@ test.describe("SatQuery flagship flow", () => {
   });
 
   test("validation errors stay in composer only", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/workstation");
     await page.getByTestId("composer-run").click();
     await expect(page.getByTestId("composer-validation-error")).toBeVisible();
     await expect(page.getByTestId("inspector")).toHaveCount(0);
   });
 
   test("keyboard focus on run control", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/workstation");
     await page.getByTestId("composer-run").focus();
     await expect(page.getByTestId("composer-run")).toBeFocused();
   });

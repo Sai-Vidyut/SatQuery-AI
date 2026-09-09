@@ -25,7 +25,7 @@ export default function TutorialPage() {
         it anytime.
       </p>
       <p className="site-page__cta-row">
-        <Link href="/" className="site-page__cta">
+        <Link href="/workstation" className="site-page__cta">
           Open workstation
         </Link>
       </p>
