@@ -5,6 +5,7 @@ import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { BeforeAfterEvidenceViewer } from "@/components/BeforeAfterEvidenceViewer";
 import { RegionDeterministicSummary } from "@/components/RegionDeterministicSummary";
 import { WorkstationGeoChatDrawer } from "@/components/WorkstationGeoChatDrawer";
+import { SolarLoader } from "@/components/ui/solar-loader";
 import { DATA_SOURCE_BANNER_TEXT, getDataSourceBanner } from "@/lib/dataSourceLabels";
 import { claimTypeLabel } from "@/lib/geo";
 import { isFetchImageryMetadata } from "@/lib/trace";
@@ -156,6 +157,15 @@ export function EvidenceInspector({
 
       <div className="inspector-body">
         <ExecutionTrace steps={result?.trace ?? []} loading={running} />
+
+        {running && !result ? (
+          <div className="inspector-section inspector-loading" data-testid="inspector-loading">
+            <div className="inspector-loading__visual">
+              <SolarLoader size={28} speed={1.5} />
+            </div>
+            <p className="inspector-loading__label">Running analysis…</p>
+          </div>
+        ) : null}
 
       {analysisError && !running ? (
         <div className="inspector-section" role="alert" data-testid="inspector-analysis-error">

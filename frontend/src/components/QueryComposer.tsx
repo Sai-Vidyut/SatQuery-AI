@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronRight, UploadCloud } from "lucide-react";
+import { SolarLoader } from "@/components/ui/solar-loader";
 import type { ImageInput } from "@/types/domain";
 
 export type ComposerInputMode = "catalog" | "upload" | "temporal_pair" | "cross_modal";
@@ -174,7 +175,9 @@ export function QueryComposer({
             aria-label={running ? "Running analysis" : "Run analysis"}
           >
             {running ? (
-              <span className="btn-spinner" aria-hidden />
+              <span className="solar-loader-host solar-loader-host--button" aria-hidden="true">
+                <SolarLoader size={20} speed={2} />
+              </span>
             ) : (
               <ArrowRight size={18} strokeWidth={2} aria-hidden />
             )}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif } from "next/font/google";
 import { GlobalNav } from "@/components/GlobalNav";
+import { MarketingPageTransition } from "@/components/MarketingPageTransition";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${instrumentSerif.variable}`}>
       <body>
         <GlobalNav />
-        {children}
+        <MarketingPageTransition>{children}</MarketingPageTransition>
       </body>
     </html>
   );
