@@ -6587,3 +6587,47 @@ main[data-reopen-pill="true"] .map-tools:not(.map-tools--dock-inspector) {
   line-height: 1.4;
 }
 
+@keyframes solar-tilt {
+  0%,
+  100% {
+    transform: rotateX(10deg) rotateY(0deg);
+  }
+  50% {
+    transform: rotateX(-10deg) rotateY(10deg);
+  }
+}
+
+@keyframes solar-orbit3d {
+  0% {
+    transform: rotateX(20deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(20deg) rotateY(-360deg);
+  }
+}
+
+.solar-loader__tilt {
+  animation: solar-tilt 10s infinite linear;
+}
+
+.solar-loader__orbit {
+  animation-name: solar-orbit3d;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.solar-loader-host--button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.solar-loader-host--button > div {
+  transform: scale(0.12);
+  transform-origin: center;
+}
+
