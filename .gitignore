@@ -3,6 +3,12 @@
 .env
 .env.local
 
+# Local integration backups — code patches only; never env copies or .env diffs
+.integration-backups/**/.env*
+.integration-backups/**/*.env.copy
+.integration-backups/**/*dot-env*
+.integration-backups/**/backend.env*
+
 # Accidental nested clone (git clone inside project root)
 SatQuery-AI/
 

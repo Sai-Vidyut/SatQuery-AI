@@ -1,0 +1,100 @@
+diff --git a/backend/.env.example b/backend/.env.example
+index 8b434b6..53891b1 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -27,6 +27,8 @@ SEMANTIC_ANALYZER=development
+ # Upload storage (Phase 8 — user-provided imagery)
+ UPLOAD_DIR=data/uploads
+ MAX_UPLOAD_SIZE_MB=256
++# Local demo: allow PNG/JPEG uploads without benchmark_dataset=true
++# UPLOAD_ALLOW_PNG_JPEG_WITHOUT_BENCHMARK=true
+ 
+ # GeoChat single-image VQA (Phase 10)
+ GEOCHAT_VQA_PROVIDER=development
+diff --git a/backend/app/adapters/imagery/uploaded/compatibility.py b/backend/app/adapters/imagery/uploaded/compatibility.py
+index 7974742..a6e096a 100644
+--- a/backend/app/adapters/imagery/uploaded/compatibility.py
++++ b/backend/app/adapters/imagery/uploaded/compatibility.py
+@@ -13,6 +13,7 @@ from app.schemas.input import (
+     SingleImageAnalysisInput,
+ )
+ from app.storage.factory import get_metadata_registry
++from app.adapters.imagery.uploaded.validation import png_jpeg_upload_permitted
+ 
+ _DIM_TOLERANCE = 0.05  # 5% relative dimension mismatch tolerance
+ _MIN_OVERLAP_FRACTION = 0.5
+@@ -66,7 +67,9 @@ def validate_single_image(image: ImageInput) -> InputValidationResult:
+         )
+     )
+ 
+-    if image.format.value in {"png", "jpeg"} and not image.benchmark_dataset:
++    if image.format.value in {"png", "jpeg"} and not png_jpeg_upload_permitted(
++        benchmark_dataset=image.benchmark_dataset
++    ):
+         checks.append(
+             InputValidationCheck(
+                 check="benchmark_dataset",
+diff --git a/backend/app/adapters/imagery/uploaded/validation.py b/backend/app/adapters/imagery/uploaded/validation.py
+index 6097d57..436d321 100644
+--- a/backend/app/adapters/imagery/uploaded/validation.py
++++ b/backend/app/adapters/imagery/uploaded/validation.py
+@@ -24,6 +24,13 @@ _RASTER_FORMATS = {ImageFormat.GEOTIFF, ImageFormat.TIFF}
+ _BENCHMARK_FORMATS = {ImageFormat.PNG, ImageFormat.JPEG}
+ 
+ 
++def png_jpeg_upload_permitted(*, benchmark_dataset: bool) -> bool:
++    """PNG/JPEG is allowed when benchmark_dataset=true or local demo upload flag is set."""
++    if benchmark_dataset:
++        return True
++    return get_settings().upload_allow_png_jpeg_without_benchmark
++
++
+ def sanitize_filename(name: str) -> str:
+     base = Path(name).name
+     cleaned = _SAFE_FILENAME.sub("_", base).strip("._")
+@@ -63,7 +70,7 @@ def validate_extension_and_format(
+             message="Unsupported file extension. Allowed: GeoTIFF, TIFF, PNG, JPEG.",
+             status_code=400,
+         )
+-    if fmt in _BENCHMARK_FORMATS and not benchmark_dataset:
++    if fmt in _BENCHMARK_FORMATS and not png_jpeg_upload_permitted(benchmark_dataset=benchmark_dataset):
+         raise SatQueryError(
+             code="benchmark_required",
+             message="PNG/JPEG uploads require benchmark_dataset=true.",
+diff --git a/backend/app/core/config.py b/backend/app/core/config.py
+index 72324a7..b9d015b 100644
+--- a/backend/app/core/config.py
++++ b/backend/app/core/config.py
+@@ -24,6 +24,7 @@ class Settings(BaseSettings):
+     openai_model: str = "gpt-4o-mini"
+     upload_dir: str = "data/uploads"
+     max_upload_size_mb: int = 256
++    upload_allow_png_jpeg_without_benchmark: bool = False
+     geochat_vqa_provider: str = "development"  # development | geochat_service
+     geochat_service_url: str | None = None
+     geochat_model_id: str = "MBZUAI/geochat-7B"
+diff --git a/backend/tests/conftest.py b/backend/tests/conftest.py
+index 3677911..4829339 100644
+--- a/backend/tests/conftest.py
++++ b/backend/tests/conftest.py
+@@ -12,6 +12,7 @@ def force_development_providers(monkeypatch: pytest.MonkeyPatch) -> None:
+     monkeypatch.setenv("CHANGE_DETECTOR", "development")
+     monkeypatch.setenv("SEMANTIC_ANALYZER", "development")
+     monkeypatch.setenv("GEOCHAT_VQA_PROVIDER", "development")
++    monkeypatch.setenv("UPLOAD_ALLOW_PNG_JPEG_WITHOUT_BENCHMARK", "false")
+     from app.core.config import get_settings
+ 
+     get_settings.cache_clear()
+diff --git a/frontend/e2e/flagship.spec.ts b/frontend/e2e/flagship.spec.ts
+index 1b3ab2b..7dfc72d 100644
+--- a/frontend/e2e/flagship.spec.ts
++++ b/frontend/e2e/flagship.spec.ts
+@@ -53,7 +53,7 @@ test.describe("SatQuery flagship flow", () => {
+     expect(await regions.count()).toBeGreaterThanOrEqual(1);
+ 
+     await expect(inspector.getByText(/Regions \(\d+\)/)).toBeVisible();
+-    await expect(page.locator(".inspector-answer")).toContainText(/confidence/i);
++    await expect(page.locator(".inspector-answer")).toContainText(/separability/i);
+     await expect(page.getByTestId("map")).toBeVisible();
+   });
+ 
